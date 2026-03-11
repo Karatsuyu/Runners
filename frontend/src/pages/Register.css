@@ -1,0 +1,148 @@
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:sans-serif;
+}
+
+.page{
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* barra superior */
+
+.top-bar{
+  height:60px;
+  background:#ffffff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 20px;
+}
+
+.top-logo{
+  height:40px;
+}
+
+.help-icon{
+  width:35px;
+  height:35px;
+  border-radius:50%;
+  border:2px solid #333;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+  cursor:pointer;
+}
+
+/* fondo */
+
+.register-container{
+  flex:1;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background-size:cover;
+  background-position:center;
+}
+
+/* tarjeta */
+
+.register-card{
+  width:460px;
+  background:#FFFDFD;
+  padding:40px;
+  border-radius:12px;
+  text-align:center;
+  position:relative;
+  box-shadow:0 10px 20px rgba(0,0,0,0.25);
+}
+
+/* logo flotante */
+
+.logo-container{
+  position:absolute;
+  top:-45px;
+  left:50%;
+  transform:translateX(-50%);
+}
+
+.logo-container img{
+  width:100px;
+  height:100px;
+  border-radius:50%;
+  object-fit:cover;
+  margin:-20px auto 8px;
+  display:block;
+}
+
+h2{
+  color:#0d4d2f;
+  margin-bottom:25px;
+}
+
+/* inputs */
+
+.row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+}
+
+.field{
+  text-align:left;
+  margin-bottom:15px;
+}
+
+.field label{
+  font-weight:600;
+  font-size:14px;
+  color:#0d4d2f;
+}
+
+.required{
+  color:red;
+  margin-left:2px;
+}
+
+.field input{
+  width:100%;
+  padding:10px;
+  border:none;
+  border-radius:12px;
+  background:#dcdcdc;
+  margin-top:5px;
+}
+
+/* boton */
+
+.btn-register{
+  width:100%;
+  padding:12px;
+  background:#0d4d2f;
+  color:white;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+  margin-top:10px;
+  cursor:pointer;
+}
+
+.btn-register:hover{
+  background:#083821;
+}
+
+/* texto inferior */
+
+.login-text{
+  margin-top:15px;
+  color:#b5b5b5;
+}
+
+.login-text a{
+  color:#0d4d2f;
+  font-weight:600;
+}
