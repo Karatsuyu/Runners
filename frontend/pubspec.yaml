@@ -1,0 +1,89 @@
+name: runners
+description: "Runners - Plataforma móvil de intermediación de servicios - Caicedonia, Valle del Cauca"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Navegación
+  go_router: ^14.6.3
+
+  # Estado (Riverpod)
+  flutter_riverpod: ^2.6.1
+
+  # HTTP / API
+  dio: ^5.7.0
+  pretty_dio_logger: ^1.4.0
+
+  # Almacenamiento seguro
+  flutter_secure_storage: ^9.2.2
+
+  # Imágenes de red con caché
+  cached_network_image: ^3.4.1
+
+  # Archivos
+  file_picker: ^8.1.7
+  image_picker: ^1.1.2
+
+  # URLs / Llamadas
+  url_launcher: ^6.3.1
+
+  # Conectividad
+  connectivity_plus: ^6.1.3
+
+  # Almacenamiento local (caché offline — Hive)
+  hive_flutter: ^1.1.0
+  hive: ^2.2.3
+
+  # Notificaciones locales
+  flutter_local_notifications: ^17.2.4
+
+  # Validadores de formulario
+  form_validator: ^2.1.1
+
+  # Variables de entorno
+  flutter_dotenv: ^5.2.1
+
+  # Internacionalización y formatos
+  intl: ^0.20.2
+
+  # SVG
+  flutter_svg: ^2.0.17
+
+  # Íconos iOS
+  cupertino_icons: ^1.0.8
+
+  # Programación funcional (Either)
+  dartz: ^0.10.1
+
+  # Comparación de objetos
+  equatable: ^2.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+    - assets/images/
+    - assets/icons/
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
