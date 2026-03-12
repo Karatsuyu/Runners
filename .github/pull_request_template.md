@@ -1,8 +1,8 @@
-## Summary
+## Resumen
 
-Describe what this PR changes and why.
+Describe qué cambia esta PR y por qué.
 
-## Type of change
+## Tipo de cambio
 
 - [ ] Feature
 - [ ] Fix
@@ -11,7 +11,7 @@ Describe what this PR changes and why.
 - [ ] Chore
 - [ ] Hotfix
 
-## Scope
+## Alcance
 
 - [ ] Frontend (`frontend/`)
 - [ ] Backend (`backend/`)
@@ -20,14 +20,14 @@ Describe what this PR changes and why.
 
 ## Checklist
 
-- [ ] Branch is based on `main`
-- [ ] Commits are clean and grouped logically
-- [ ] No secrets were committed (`.env`, keys, tokens)
-- [ ] Updated docs when behavior changed
-- [ ] Updated migrations if models changed
-- [ ] Updated Postman collection if API changed
+- [ ] La rama está basada en `main`
+- [ ] Los commits están limpios y agrupados lógicamente
+- [ ] No se subieron secretos (`.env`, llaves, tokens)
+- [ ] Se actualizó documentación cuando cambió el comportamiento
+- [ ] Se actualizaron migraciones si cambiaron modelos
+- [ ] Se actualizó colección de Postman si cambió la API
 
-## Validation performed
+## Validación realizada
 
 ### Frontend
 
@@ -39,27 +39,27 @@ Describe what this PR changes and why.
 
 - [ ] `manage.py check`
 - [ ] `manage.py test`
-- [ ] `makemigrations` / `migrate` when needed
+- [ ] `makemigrations` / `migrate` cuando aplique
 
-## Manual test steps
+## Pasos de prueba manual
 
-List exact steps for reviewers to validate quickly.
+Lista pasos exactos para que revisión valide rápido.
 
 1.
 2.
 3.
 
-## Breaking changes
+## Cambios breaking
 
 - [ ] No
-- [ ] Yes (describe below)
+- [ ] Sí (describir abajo)
 
-If yes, explain required migration, deployment order, or compatibility notes.
+Si es Sí, explica migración requerida, orden de despliegue o notas de compatibilidad.
 
-## Related issue / task
+## Issue / tarea relacionada
 
-Link issue, ticket, or task reference.
+Enlaza issue, ticket o referencia de tarea.
 
-## Screenshots / evidence (optional)
+## Capturas / evidencia (opcional)
 
-Attach screenshots, logs, or sample API responses when useful.
+Adjunta capturas, logs o respuestas de API cuando ayude.

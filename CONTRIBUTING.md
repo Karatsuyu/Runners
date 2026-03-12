@@ -1,18 +1,18 @@
-# Contributing Guide
+# Guía de Contribución
 
-This repository is maintained by a team of three developers. This document defines the standard workflow to keep development clean and predictable.
+Este repositorio es mantenido por un equipo de tres desarrolladores. Este documento define el flujo de trabajo estándar para mantener el desarrollo limpio y predecible.
 
-## 1) Team workflow
+## 1) Flujo de trabajo del equipo
 
-- Keep `main` always deployable and stable.
-- Do not commit directly to `main` for feature work.
-- Use short-lived branches and open Pull Requests.
-- Require at least one review before merge.
-- Prefer small PRs focused on one topic.
+- Mantener `main` siempre estable y desplegable.
+- No hacer commits directos a `main` para trabajo de funcionalidades.
+- Usar ramas de corta duración y abrir Pull Requests.
+- Requerir al menos una revisión antes de hacer merge.
+- Preferir PR pequeñas enfocadas en un solo tema.
 
-## 2) Branch strategy
+## 2) Estrategia de ramas
 
-Create branches from `main` using one of these prefixes:
+Crear ramas desde `main` usando uno de estos prefijos:
 
 - `feature/<scope>-<short-description>`
 - `fix/<scope>-<short-description>`
@@ -21,16 +21,16 @@ Create branches from `main` using one of these prefixes:
 - `chore/<scope>-<short-description>`
 - `hotfix/<scope>-<short-description>`
 
-Examples:
+Ejemplos:
 
 - `feature/frontend-auth-refresh-token`
 - `feature/backend-deliveries-auto-assign`
 - `fix/backend-services-provider-validation`
 - `docs/project-team-onboarding`
 
-## 3) Commit conventions
+## 3) Convención de commits
 
-Use concise, semantic commit messages:
+Usar mensajes de commit concisos y semánticos:
 
 - `feat(frontend): add login token refresh`
 - `feat(backend): add deliveries auto-assign endpoint`
@@ -39,35 +39,35 @@ Use concise, semantic commit messages:
 - `docs: update onboarding and run instructions`
 - `chore: update gitignore and env templates`
 
-Rules:
+Reglas:
 
-- Keep subject line under ~72 chars when possible.
-- Use present tense and imperative mood.
-- One logical change per commit.
-- Do not use emoji in commit messages.
+- Mantener el asunto por debajo de ~72 caracteres cuando sea posible.
+- Usar presente e imperativo.
+- Un cambio lógico por commit.
+- No usar emojis en mensajes de commit.
 
-## 4) Pull Request process
+## 4) Proceso de Pull Request
 
-1. Update local `main`.
-2. Create a branch from `main`.
-3. Commit in logical chunks.
-4. Push branch to origin.
-5. Open PR to `main`.
-6. Request review from at least one teammate.
-7. Address feedback.
-8. Merge only when checks pass.
+1. Actualizar `main` local.
+2. Crear una rama desde `main`.
+3. Hacer commits en bloques lógicos.
+4. Hacer push de la rama a origin.
+5. Abrir PR hacia `main`.
+6. Solicitar revisión de al menos un compañero.
+7. Atender feedback.
+8. Hacer merge solo cuando los checks pasen.
 
-## 5) PR size and scope
+## 5) Tamaño y alcance de PR
 
-- Prefer PRs under ~500 changed lines when possible.
-- Separate backend/frontend/docs changes into independent PRs unless tightly coupled.
-- If a change is large, split into stacked PRs.
+- Preferir PR por debajo de ~500 líneas cambiadas cuando sea posible.
+- Separar cambios de backend/frontend/docs en PR independientes, salvo que estén fuertemente acoplados.
+- Si un cambio es grande, dividirlo en PR encadenadas.
 
-## 6) Code quality checks
+## 6) Checks de calidad de código
 
 ### Frontend (Flutter)
 
-Run before opening PR:
+Ejecutar antes de abrir la PR:
 
 ```powershell
 Set-Location frontend
@@ -78,7 +78,7 @@ flutter test
 
 ### Backend (Django)
 
-Run before opening PR:
+Ejecutar antes de abrir la PR:
 
 ```powershell
 Set-Location backend
@@ -87,23 +87,23 @@ $c = "c:\Users\Usuario\Documents\runners\.venv\Scripts\python.exe"
 & $c manage.py test
 ```
 
-If tests are not available for a module yet, include clear manual verification steps in the PR description.
+Si una parte aún no tiene pruebas automáticas, incluir pasos de validación manual claros en la descripción de la PR.
 
-## 7) Environment and secrets
+## 7) Entorno y secretos
 
-- Never commit real secrets.
-- Use template files only:
+- Nunca subir secretos reales.
+- Usar solo archivos plantilla:
   - `frontend/.env.example`
   - `backend/.env.example`
-- Local runtime files are ignored:
+- Los archivos locales de ejecución están ignorados:
   - `frontend/.env`
   - `backend/.env`
 
-## 8) Database and migrations
+## 8) Base de datos y migraciones
 
-- Create migrations in the same PR where model changes are introduced.
-- Do not edit applied migrations unless absolutely necessary.
-- Verify migrations locally:
+- Crear migraciones en la misma PR donde se introducen cambios de modelo.
+- No editar migraciones ya aplicadas salvo caso excepcional.
+- Verificar migraciones localmente:
 
 ```powershell
 Set-Location backend
@@ -112,32 +112,32 @@ $c = "c:\Users\Usuario\Documents\runners\.venv\Scripts\python.exe"
 & $c manage.py migrate
 ```
 
-## 9) API changes
+## 9) Cambios de API
 
-When changing backend endpoints:
+Al cambiar endpoints de backend:
 
-- Update serializers/views/urls consistently.
-- Update `backend/runners_api_postman.json` if needed.
-- Document breaking changes in PR description.
+- Actualizar serializers/views/urls de forma consistente.
+- Actualizar `backend/runners_api_postman.json` si aplica.
+- Documentar cambios breaking en la descripción de la PR.
 
-## 10) Frontend-backend coordination
+## 10) Coordinación frontend-backend
 
-When a contract changes:
+Cuando cambie un contrato:
 
-- Backend PR includes API contract details.
-- Frontend PR includes updated integration usage.
-- Mention required deployment order in PR.
+- La PR de backend debe incluir el detalle del contrato API.
+- La PR de frontend debe incluir el consumo actualizado.
+- Indicar el orden de despliegue requerido en la PR.
 
-## 11) Merge policy
+## 11) Política de merge
 
-- Preferred merge method: Squash or Rebase (team decision, keep history readable).
-- Delete branch after merge.
-- If urgent production issue: use `hotfix/*` and open PR with priority review.
+- Método recomendado: Squash o Rebase (decisión del equipo, manteniendo historial legible).
+- Eliminar la rama después del merge.
+- Si hay incidencia urgente en producción: usar `hotfix/*` y abrir PR con revisión prioritaria.
 
-## 12) Quick start for developers
+## 12) Inicio rápido para desarrolladores
 
 ```powershell
-# Clone and enter repo
+# Clonar y entrar al repositorio
 Set-Location "c:\Users\Usuario\Documents"
 git clone https://github.com/Karatsuyu/Runners.git
 Set-Location Runners
@@ -149,19 +149,19 @@ $c = "c:\Users\Usuario\Documents\runners\.venv\Scripts\python.exe"
 & $c manage.py seed_data
 & $c manage.py runserver 0.0.0.0:8000
 
-# Frontend (new terminal)
+# Frontend (nueva terminal)
 Set-Location "c:\Users\Usuario\Documents\runners\frontend"
 flutter pub get
 flutter run
 ```
 
-## 13) Ownership and communication
+## 13) Responsables y comunicación
 
-- Assign each PR to one owner and one reviewer.
-- Use PR description to explain:
-  - What changed
-  - Why it changed
-  - How it was tested
-  - Any risks or follow-up tasks
+- Asignar cada PR a un responsable y un revisor.
+- Usar la descripción de la PR para explicar:
+  - Qué cambió
+  - Por qué cambió
+  - Cómo se probó
+  - Riesgos o tareas de seguimiento
 
-Keeping this workflow consistent will reduce regressions and make onboarding easier for all developers.
+Mantener este flujo de trabajo de forma consistente reduce regresiones y facilita el onboarding de todos los desarrolladores.
