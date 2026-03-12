@@ -250,6 +250,13 @@ gunicorn runners_project.wsgi:application
 - App refresca automáticamente (Riverpod interceptor)
 - Si persiste: logout y login nuevamente
 
+## 🤝 Contribución del equipo
+
+- Guía de colaboración: `CONTRIBUTING.md`
+- Plantilla de Pull Request: `.github/pull_request_template.md`
+- Convención de ramas: `feature/*`, `fix/*`, `refactor/*`, `docs/*`, `chore/*`, `hotfix/*`
+- Política recomendada: no desarrollar directo en `main`; trabajar con PR y revisión
+
 ## 📄 Licencia
 
 Proyecto privado - Caicedonia, Valle del Cauca 2026
