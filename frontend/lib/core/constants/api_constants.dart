@@ -1,8 +1,21 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiConstants {
-  static String get baseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8000/api/v1';
+  static String get baseUrl {
+    final defaultUrl = 'http://10.0.2.2:8000/api/v1';
+    final rawBaseUrl =
+        (kIsWeb ? dotenv.env['API_BASE_URL_WEB'] : null) ??
+            dotenv.env['API_BASE_URL'] ??
+            defaultUrl;
+
+    // 10.0.2.2 is only valid inside Android emulator.
+    if (kIsWeb && rawBaseUrl.contains('10.0.2.2')) {
+      return rawBaseUrl.replaceFirst('10.0.2.2', 'localhost');
+    }
+
+    return rawBaseUrl;
+  }
 
   // Auth
   static const String register = '/auth/register/';

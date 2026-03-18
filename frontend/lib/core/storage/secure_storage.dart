@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../constants/storage_keys.dart';
 
 class SecureStorageService {
   final FlutterSecureStorage _storage;
+  static const Duration _ioTimeout = Duration(seconds: 5);
 
   SecureStorageService()
       : _storage = const FlutterSecureStorage(
@@ -14,19 +17,38 @@ class SecureStorageService {
     required String accessToken,
     required String refreshToken,
   }) async {
-    await Future.wait([
-      _storage.write(key: StorageKeys.accessToken, value: accessToken),
-      _storage.write(key: StorageKeys.refreshToken, value: refreshToken),
-    ]);
+    // Sequential writes avoid sporadic lockups observed in some web runtimes.
+    await _storage
+        .write(key: StorageKeys.accessToken, value: accessToken)
+        .timeout(_ioTimeout);
+    await _storage
+        .write(key: StorageKeys.refreshToken, value: refreshToken)
+        .timeout(_ioTimeout);
   }
 
-  Future<String?> getAccessToken() =>
-      _storage.read(key: StorageKeys.accessToken);
+  Future<String?> getAccessToken() async {
+    try {
+      return await _storage.read(key: StorageKeys.accessToken).timeout(_ioTimeout);
+    } catch (_) {
+      return null;
+    }
+  }
 
-  Future<String?> getRefreshToken() =>
-      _storage.read(key: StorageKeys.refreshToken);
+  Future<String?> getRefreshToken() async {
+    try {
+      return await _storage.read(key: StorageKeys.refreshToken).timeout(_ioTimeout);
+    } catch (_) {
+      return null;
+    }
+  }
 
-  Future<void> clearAll() => _storage.deleteAll();
+  Future<void> clearAll() async {
+    try {
+      await _storage.deleteAll().timeout(_ioTimeout);
+    } catch (_) {
+      // Ignored intentionally; clearing tokens is best-effort.
+    }
+  }
 
   Future<bool> hasValidSession() async {
     final token = await getAccessToken();

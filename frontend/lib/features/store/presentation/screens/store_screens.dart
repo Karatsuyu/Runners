@@ -8,9 +8,170 @@ import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/domain/entities/user_entity.dart';
+
+void _redirectGuestToLogin(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Debes iniciar sesión para realizar compras.'),
+    ),
+  );
+  context.go(AppRoutes.login);
+}
 
 class StoreScreen extends ConsumerWidget {
   const StoreScreen({super.key});
+
+  Future<void> _openProfileMenu(
+    BuildContext context,
+    WidgetRef ref,
+    UserEntity? user,
+    bool isGuest,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.person_outline),
+                  ),
+                  title: Text(user?.fullName.isNotEmpty == true
+                      ? user!.fullName
+                      : (isGuest ? 'Modo invitado' : 'Mi perfil')),
+                  subtitle: Text(user?.email ?? 'Sin correo'),
+                ),
+                if (!isGuest)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Editar perfil'),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      final updated = await _openEditProfileDialog(context, ref, user);
+                      if (updated && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Perfil actualizado')),
+                        );
+                      }
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    isGuest ? Icons.login_rounded : Icons.logout,
+                    color: Colors.red,
+                  ),
+                  title: Text(
+                    isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    if (!isGuest) {
+                      await ref.read(authProvider.notifier).logout();
+                    }
+                    if (context.mounted) {
+                      context.go(AppRoutes.login);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<bool> _openEditProfileDialog(
+    BuildContext context,
+    WidgetRef ref,
+    UserEntity? user,
+  ) async {
+    final firstNameController = TextEditingController(text: user?.firstName ?? '');
+    final lastNameController = TextEditingController(text: user?.lastName ?? '');
+    final phoneController = TextEditingController(text: user?.phone ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Editar perfil'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lastNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Apellidos'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Teléfono'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final firstName = firstNameController.text.trim();
+                final lastName = lastNameController.text.trim();
+                if (firstName.isEmpty || lastName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nombre y apellidos son obligatorios'),
+                    ),
+                  );
+                  return;
+                }
+
+                final ok = await ref.read(authProvider.notifier).updateProfile(
+                      firstName: firstName,
+                      lastName: lastName,
+                      phone: phoneController.text.trim(),
+                    );
+                if (!dialogContext.mounted) return;
+
+                if (ok) {
+                  Navigator.of(dialogContext).pop(true);
+                } else {
+                  final error = ref.read(authProvider).error ??
+                      'No fue posible actualizar el perfil';
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error)),
+                  );
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    firstNameController.dispose();
+    lastNameController.dispose();
+    phoneController.dispose();
+    return result ?? false;
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,16 +179,30 @@ class StoreScreen extends ConsumerWidget {
     final commercesAsync = ref.watch(commercesProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
     final cart = ref.watch(cartProvider);
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    final isGuest = authState.isGuest;
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'Perfil',
+          onPressed: () => _openProfileMenu(context, ref, user, isGuest),
+        ),
         title: const Text('Tienda Runners'),
         actions: [
           Stack(
             children: [
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => context.go('/client/cart'),
+                onPressed: () {
+                  if (isGuest) {
+                    _redirectGuestToLogin(context);
+                    return;
+                  }
+                  context.go('/client/cart');
+                },
               ),
               if (cart.isNotEmpty)
                 Positioned(
@@ -147,7 +322,13 @@ class StoreScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppColors.primaryGreen,
-        onPressed: () => context.go('/client/orders'),
+        onPressed: () {
+          if (isGuest) {
+            _redirectGuestToLogin(context);
+            return;
+          }
+          context.go('/client/orders');
+        },
         icon: const Icon(Icons.history, color: Colors.white),
         label: const Text('Mis Pedidos',
             style: TextStyle(color: Colors.white)),
@@ -165,6 +346,7 @@ class CommerceDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(commerceProductsProvider(commerceId));
     final cart = ref.watch(cartProvider);
+    final isGuest = ref.watch(authProvider).isGuest;
     final currency =
         NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
 
@@ -176,7 +358,13 @@ class CommerceDetailScreen extends ConsumerWidget {
             children: [
               IconButton(
                 icon: const Icon(Icons.shopping_cart_outlined),
-                onPressed: () => context.go('/client/cart'),
+                onPressed: () {
+                  if (isGuest) {
+                    _redirectGuestToLogin(context);
+                    return;
+                  }
+                  context.go('/client/cart');
+                },
               ),
               if (cart.isNotEmpty)
                 Positioned(
@@ -275,33 +463,45 @@ class CommerceDetailScreen extends ConsumerWidget {
                                 IconButton(
                                   icon: const Icon(Icons.add_circle,
                                       color: AppColors.primaryGreen),
-                                  onPressed: () => ref
-                                      .read(cartProvider.notifier)
-                                      .addItem(
-                                        OrderItemInput(
-                                          productId: p.id,
-                                          productName: p.name,
-                                          unitPrice: p.price,
-                                          quantity: 1,
-                                        ),
-                                        commerceId,
-                                      ),
+                                  onPressed: () {
+                                    if (isGuest) {
+                                      _redirectGuestToLogin(context);
+                                      return;
+                                    }
+                                    ref
+                                        .read(cartProvider.notifier)
+                                        .addItem(
+                                          OrderItemInput(
+                                            productId: p.id,
+                                            productName: p.name,
+                                            unitPrice: p.price,
+                                            quantity: 1,
+                                          ),
+                                          commerceId,
+                                        );
+                                  },
                                 ),
                               ],
                             )
                           else
                             ElevatedButton(
-                              onPressed: () => ref
-                                  .read(cartProvider.notifier)
-                                  .addItem(
-                                    OrderItemInput(
-                                      productId: p.id,
-                                      productName: p.name,
-                                      unitPrice: p.price,
-                                      quantity: 1,
-                                    ),
-                                    commerceId,
-                                  ),
+                              onPressed: () {
+                                if (isGuest) {
+                                  _redirectGuestToLogin(context);
+                                  return;
+                                }
+                                ref
+                                    .read(cartProvider.notifier)
+                                    .addItem(
+                                      OrderItemInput(
+                                        productId: p.id,
+                                        productName: p.name,
+                                        unitPrice: p.price,
+                                        quantity: 1,
+                                      ),
+                                      commerceId,
+                                    );
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryGreen,
                                 padding: const EdgeInsets.symmetric(
@@ -335,6 +535,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   String? _error;
 
   Future<void> _confirmOrder() async {
+    if (ref.read(authProvider).isGuest) {
+      _redirectGuestToLogin(context);
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;

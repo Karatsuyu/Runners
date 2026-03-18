@@ -56,6 +56,9 @@ dependencies:
   # SVG
   flutter_svg: ^2.0.17
 
+  # Tipografia
+  google_fonts: ^6.2.1
+
   # Íconos iOS
   cupertino_icons: ^1.0.8
 

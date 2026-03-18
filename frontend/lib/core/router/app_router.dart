@@ -32,14 +32,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authState = ref.read(authProvider);
       final isAuth = authState.isAuthenticated;
+      final isGuest = authState.isGuest;
       final location = state.matchedLocation;
 
       final publicRoutes = [AppRoutes.splash, AppRoutes.login, AppRoutes.register];
       final isPublic = publicRoutes.contains(location);
+      final isClientRoute = location.startsWith('/client/');
+      final guestBlockedRoutes = [
+        '/client/cart',
+        AppRoutes.orderHistory,
+        AppRoutes.orderConfirm,
+      ];
+      final isGuestBlockedRoute =
+          guestBlockedRoutes.any((route) => location.startsWith(route));
 
-      if (!isAuth && !isPublic) return AppRoutes.login;
+      if (!isAuth && !isGuest && !isPublic) return AppRoutes.login;
+
+      if (isGuest && !isPublic && !isClientRoute) return AppRoutes.login;
+      if (isGuest && isGuestBlockedRoute) return AppRoutes.login;
+
       if (isAuth && isPublic && location != AppRoutes.splash) {
         return _homeForRole(authState.user?.role);
+      }
+      if (!isAuth && isGuest && location == AppRoutes.splash) {
+        return AppRoutes.store;
       }
       return null;
     },

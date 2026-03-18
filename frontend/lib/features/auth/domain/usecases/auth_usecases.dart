@@ -28,3 +28,10 @@ class GetProfileUseCase {
   GetProfileUseCase(this._repository);
   Future<Either<Failure, UserEntity>> call() => _repository.getProfile();
 }
+
+class UpdateProfileUseCase {
+  final AuthRepository _repository;
+  UpdateProfileUseCase(this._repository);
+  Future<Either<Failure, UserEntity>> call(Map<String, String> data) =>
+      _repository.updateProfile(data);
+}

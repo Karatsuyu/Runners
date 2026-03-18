@@ -7,6 +7,7 @@ abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> login(String email, String password);
   Future<Map<String, dynamic>> register(Map<String, String> data);
   Future<UserModel> getProfile();
+  Future<UserModel> updateProfile(Map<String, String> data);
   Future<void> logout(String refreshToken);
 }
 
@@ -41,6 +42,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> getProfile() async {
     try {
       final response = await _dio.get(ApiConstants.profile);
+      return UserModel.fromJson(response.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  @override
+  Future<UserModel> updateProfile(Map<String, String> data) async {
+    try {
+      final response = await _dio.patch(ApiConstants.profile, data: data);
       return UserModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);

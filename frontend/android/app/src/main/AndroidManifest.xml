@@ -25,7 +25,7 @@
         android:label="Runners"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <!-- ⚠️ android:usesCleartextTraffic="true" solo para desarrollo local.
              En producción con HTTPS, eliminar esta línea. -->

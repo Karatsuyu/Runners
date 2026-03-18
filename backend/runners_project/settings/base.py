@@ -8,7 +8,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+_allowed_hosts_env = os.getenv('ALLOWED_HOSTS')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in (
+        _allowed_hosts_env.split(',')
+        if _allowed_hosts_env
+        else ['localhost', '127.0.0.1', '[::1]', '10.0.2.2']
+    )
+    if host.strip()
+]
 
 # Aplicaciones instaladas
 DJANGO_APPS = [
@@ -102,6 +111,10 @@ else:
         'CORS_ALLOWED_ORIGINS',
         'http://localhost:5173,http://10.0.2.2:8000,http://127.0.0.1:8000'
     ).split(',')
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost(:\d+)?$',
+    r'^http://127\.0\.0\.1(:\d+)?$',
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',

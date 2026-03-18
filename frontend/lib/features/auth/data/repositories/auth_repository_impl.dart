@@ -73,6 +73,23 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, UserEntity>> updateProfile(
+      Map<String, String> data) async {
+    try {
+      final user = await _remoteDataSource.updateProfile(data);
+      return Right(user.toEntity());
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(message: e.firstError));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, void>> logout() async {
     try {
       final refreshToken = await _storage.getRefreshToken();
