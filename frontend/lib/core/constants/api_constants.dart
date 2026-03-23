@@ -58,6 +58,7 @@ class ApiConstants {
   // Contacts (solo directorio, sin disponibilidad)
   static const String contacts = '/contacts/';
   static String contactDetail(int id) => '/contacts/$id/';
+  static String contactReview(int id) => '/contacts/$id/review/';
 
   // Provider profile
   static String providerDetail(int id) => '/services/providers/$id/';

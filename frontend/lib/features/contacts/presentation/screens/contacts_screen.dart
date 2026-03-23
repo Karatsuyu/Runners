@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io';
 import '../../../../core/constants/app_colors.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../providers/contacts_provider.dart';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ContactsScreen  (directorio puro — sin indicador de disponibilidad)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class ContactsScreen extends ConsumerStatefulWidget {
   const ContactsScreen({super.key});
@@ -30,7 +29,11 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(contactsProvider);
-    final typeFilter = ref.watch(contactTypeFilterProvider);
+    final authState = ref.watch(authProvider);
+    final currentUser = authState.user;
+    final isAdmin = currentUser?.isAdmin ?? false;
+    final isGuest = authState.isGuest;
+    final query = _searchController.text.trim().toLowerCase();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -42,14 +45,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
       ),
       body: Column(
         children: [
-          // ── Search Bar ────────────────────────────────────────────
           Container(
             color: AppColors.primaryGreen,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               controller: _searchController,
-              onChanged: (val) =>
-                  ref.read(contactSearchProvider.notifier).state = val,
+              onChanged: (val) {
+                ref.read(contactSearchProvider.notifier).state = val;
+                setState(() {});
+              },
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Buscar contactos...',
@@ -61,6 +65,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                         onPressed: () {
                           _searchController.clear();
                           ref.read(contactSearchProvider.notifier).state = '';
+                          setState(() {});
                         },
                       )
                     : null,
@@ -75,49 +80,6 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
             ),
           ),
 
-          // ── Type Filter Chips ─────────────────────────────────────
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                _FilterChip(
-                  label: 'Todos',
-                  selected: typeFilter == null,
-                  onTap: () =>
-                      ref.read(contactTypeFilterProvider.notifier).state = null,
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Emergencia',
-                  selected: typeFilter == 'emergency',
-                  onTap: () => ref
-                      .read(contactTypeFilterProvider.notifier)
-                      .state = 'emergency',
-                  color: AppColors.error,
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Profesional',
-                  selected: typeFilter == 'professional',
-                  onTap: () => ref
-                      .read(contactTypeFilterProvider.notifier)
-                      .state = 'professional',
-                ),
-                const SizedBox(width: 8),
-                _FilterChip(
-                  label: 'Comercio',
-                  selected: typeFilter == 'commerce',
-                  onTap: () => ref
-                      .read(contactTypeFilterProvider.notifier)
-                      .state = 'commerce',
-                  color: AppColors.statusConfirmed,
-                ),
-              ],
-            ),
-          ),
-
-          // ── List ──────────────────────────────────────────────────
           Expanded(
             child: contactsAsync.when(
               loading: () => const AppLoading(),
@@ -126,23 +88,39 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                 onRetry: () => ref.invalidate(contactsProvider),
               ),
               data: (contacts) {
-                if (contacts.isEmpty) {
+                final filtered = contacts.where((c) {
+                  if (query.isEmpty) return true;
+                  final byName = c.name.toLowerCase().contains(query);
+                  final byPhone = c.phone.toLowerCase().contains(query);
+                  return byName || byPhone;
+                }).toList();
+
+                if (filtered.isEmpty) {
                   return const AppEmptyState(
-                    icon: Icons.contacts_outlined,
+                    icon: Icons.contact_page_outlined,
                     title: 'Sin contactos',
-                    subtitle: 'No se encontraron contactos con ese filtro',
+                    subtitle: 'No hay contactos para mostrar',
                   );
                 }
                 return RefreshIndicator(
                   color: AppColors.primaryGreen,
                   onRefresh: () async => ref.invalidate(contactsProvider),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    itemCount: contacts.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 0.75,
+                    ),
+                    itemCount: filtered.length,
                     itemBuilder: (context, i) =>
-                        _ContactCard(contact: contacts[i]),
+                        _ContactTile(
+                          contact: filtered[i],
+                          isCurrentUserOwner: currentUser != null &&
+                              filtered[i].ownerId == currentUser.id,
+                        ),
                   ),
                 );
               },
@@ -150,82 +128,314 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           ),
         ],
       ),
+      floatingActionButton: isGuest
+          ? null
+          : isAdmin
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.primaryGreen,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_alt_1),
+              label: const Text('Agregar'),
+              onPressed: _openCreateContactDialog,
+            )
+          : contactsAsync.maybeWhen(
+              data: (contacts) {
+                final myContact = (currentUser == null)
+                    ? null
+                    : contacts.cast<ContactModel?>().firstWhere(
+                          (c) => c?.ownerId == currentUser.id,
+                          orElse: () => null,
+                        );
+                return FloatingActionButton.extended(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                  icon: Icon(
+                    myContact?.isApproved == true
+                        ? Icons.edit
+                        : Icons.how_to_reg_rounded,
+                  ),
+                  label: Text(
+                    myContact?.isApproved == true
+                        ? 'Editar mi contacto'
+                        : 'Solicitar contacto',
+                  ),
+                  onPressed: () {
+                    if (myContact?.isApproved == true) {
+                      _openEditOwnContactDialog(myContact!);
+                    } else {
+                      _openCreateContactDialog();
+                    }
+                  },
+                );
+              },
+              orElse: () => null,
+            ),
     );
   }
-}
 
-// ── Filter chip ──────────────────────────────────────────────────────────────
+  Future<void> _openCreateContactDialog() async {
+    final authUser = ref.read(authProvider).user;
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final descriptionCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final picker = ImagePicker();
+    XFile? pickedImage;
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color? color;
-
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? AppColors.primaryGreen;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? c : Colors.transparent,
-          border: Border.all(color: selected ? c : AppColors.textSecondary),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-            fontSize: 13,
+    await showDialog<void>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Nuevo contacto'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      final image = await _pickFromCameraOrGallery(
+                        context: dialogContext,
+                        picker: picker,
+                      );
+                      if (image != null) {
+                        setDialogState(() {
+                          pickedImage = image;
+                        });
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 38,
+                      backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.12),
+                      backgroundImage: pickedImage != null
+                          ? FileImage(File(pickedImage!.path))
+                          : null,
+                      child: pickedImage == null
+                          ? const Icon(
+                              Icons.add_a_photo_outlined,
+                              color: AppColors.primaryGreen,
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Seleccionar foto (cámara o galería)',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nombre'),
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Ingresa un nombre' : null,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Teléfono'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Ingresa un teléfono'
+                        : null,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: 'Email (opcional)'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: descriptionCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Qué haces / descripción',
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                try {
+                  final effectiveEmail = emailCtrl.text.trim().isNotEmpty
+                      ? emailCtrl.text.trim()
+                      : authUser?.email;
+                  await ref.read(contactsActionsProvider).addManualContact(
+                        name: nameCtrl.text.trim(),
+                        phone: phoneCtrl.text.trim(),
+                        email: effectiveEmail,
+                        description: descriptionCtrl.text.trim().isEmpty
+                            ? null
+                            : descriptionCtrl.text.trim(),
+                        imagePath: pickedImage?.path,
+                      );
+                  ref.invalidate(contactsProvider);
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                  }
+                } catch (e) {
+                  if (!dialogContext.mounted) return;
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(
+                      content: Text('No se pudo guardar el contacto: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
         ),
       ),
     );
+
+    nameCtrl.dispose();
+    phoneCtrl.dispose();
+    emailCtrl.dispose();
+    descriptionCtrl.dispose();
+  }
+
+  Future<void> _openEditOwnContactDialog(ContactModel contact) async {
+    final phoneCtrl = TextEditingController(text: contact.phone);
+    final formKey = GlobalKey<FormState>();
+    final picker = ImagePicker();
+    XFile? pickedImage;
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final ImageProvider<Object>? imageProvider = pickedImage != null
+              ? FileImage(File(pickedImage!.path))
+              : (contact.imageUrl != null && contact.imageUrl!.isNotEmpty
+                  ? NetworkImage(contact.imageUrl!)
+                  : null);
+          return AlertDialog(
+            title: const Text('Editar mi contacto'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      final image = await _pickFromCameraOrGallery(
+                        context: dialogContext,
+                        picker: picker,
+                      );
+                      if (image != null) {
+                        setDialogState(() {
+                          pickedImage = image;
+                        });
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 38,
+                      backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.12),
+                      backgroundImage: imageProvider,
+                      child: pickedImage == null &&
+                              (contact.imageUrl == null || contact.imageUrl!.isEmpty)
+                          ? const Icon(Icons.add_a_photo_outlined, color: AppColors.primaryGreen)
+                          : null,
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: 'Teléfono'),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Ingresa un teléfono'
+                      : null,
+                ),
+              ],
+            ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  try {
+                    await ref.read(contactsActionsProvider).updateOwnContact(
+                          contactId: contact.id,
+                          phone: phoneCtrl.text.trim(),
+                          imagePath: pickedImage?.path,
+                        );
+                    ref.invalidate(contactsProvider);
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  } catch (e) {
+                    if (!dialogContext.mounted) return;
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(
+                        content: Text('No se pudo actualizar: $e'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    phoneCtrl.dispose();
+  }
+
+  Future<XFile?> _pickFromCameraOrGallery({
+    required BuildContext context,
+    required ImagePicker picker,
+  }) async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar foto'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de galería'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return null;
+    return picker.pickImage(source: source, imageQuality: 75, maxWidth: 1200);
   }
 }
 
-// ── Contact card ─────────────────────────────────────────────────────────────
-
-class _ContactCard extends StatelessWidget {
+class _ContactTile extends StatelessWidget {
   final ContactModel contact;
-  const _ContactCard({required this.contact});
-
-  Color get _typeColor {
-    switch (contact.type) {
-      case 'emergency':
-        return AppColors.error;
-      case 'professional':
-        return AppColors.primaryGreen;
-      case 'commerce':
-        return AppColors.statusConfirmed;
-      default:
-        return AppColors.textSecondary;
-    }
-  }
-
-  IconData get _typeIcon {
-    switch (contact.type) {
-      case 'emergency':
-        return Icons.emergency_outlined;
-      case 'professional':
-        return Icons.work_outline;
-      case 'commerce':
-        return Icons.store_outlined;
-      default:
-        return Icons.person_outline;
-    }
-  }
+  final bool isCurrentUserOwner;
+  const _ContactTile({
+    required this.contact,
+    required this.isCurrentUserOwner,
+  });
 
   Future<void> _call() async {
     final uri = Uri(scheme: 'tel', path: contact.phone);
@@ -234,128 +444,100 @@ class _ContactCard extends StatelessWidget {
     }
   }
 
-  Future<void> _email() async {
-    if (contact.email == null) return;
-    final uri = Uri(scheme: 'mailto', path: contact.email!);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: _typeColor.withValues(alpha: 0.12),
-              child: Icon(_typeIcon, color: _typeColor, size: 22),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          contact.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _typeColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          contact.typeLabel,
-                          style: TextStyle(
-                            color: _typeColor,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    contact.phone,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                    ),
-                  ),
-                  if (contact.description != null &&
-                      contact.description!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      contact.description!,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
+      elevation: 1.5,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: contact.imageUrl != null && contact.imageUrl!.isNotEmpty
+                ? Image.network(
+                    contact.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _fallbackImage(),
+                  )
+                : _fallbackImage(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: Text(
+              contact.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              children: [
-                _IconBtn(
-                  icon: Icons.phone,
-                  color: AppColors.success,
-                  onTap: _call,
+          ),
+          if (isCurrentUserOwner && !contact.isApproved)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: contact.approvalStatus == 'RECHAZADO'
+                      ? AppColors.error.withValues(alpha: 0.12)
+                      : AppColors.warning.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                if (contact.email != null) ...[
-                  const SizedBox(height: 4),
-                  _IconBtn(
-                    icon: Icons.email_outlined,
-                    color: AppColors.primaryGreen,
-                    onTap: _email,
+                child: Text(
+                  contact.approvalStatus == 'RECHAZADO'
+                      ? 'Rechazado'
+                      : 'Pendiente aprobación',
+                  style: TextStyle(
+                    color: contact.approvalStatus == 'RECHAZADO'
+                        ? AppColors.error
+                        : AppColors.warning,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ],
+                ),
+              ),
             ),
-          ],
-        ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              contact.phone,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: SizedBox(
+              height: 34,
+              child: ElevatedButton.icon(
+                onPressed: _call,
+                icon: const Icon(Icons.phone, size: 16),
+                label: const Text('Llamar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-class _IconBtn extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _IconBtn({required this.icon, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: 18, color: color),
+  Widget _fallbackImage() {
+    return Container(
+      color: AppColors.primaryGreen.withValues(alpha: 0.08),
+      child: const Icon(
+        Icons.person_rounded,
+        size: 56,
+        color: AppColors.primaryGreen,
       ),
     );
   }

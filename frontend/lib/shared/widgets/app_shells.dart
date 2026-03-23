@@ -21,9 +21,8 @@ class ClientShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     final tabs = [
-      _NavTab(AppRoutes.store, Icons.store_rounded, 'Tienda'),
-      _NavTab(AppRoutes.services, Icons.handyman_rounded, 'Servicios'),
       _NavTab(AppRoutes.deliveries, Icons.delivery_dining_rounded, 'Domicilios'),
+      _NavTab(AppRoutes.store, Icons.store_rounded, 'Tienda'),
       _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int currentIndex =

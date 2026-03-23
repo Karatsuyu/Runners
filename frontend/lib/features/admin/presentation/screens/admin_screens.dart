@@ -894,10 +894,42 @@ class ManageContactsScreen extends ConsumerWidget {
                     ),
                     title: Text(c.name,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${c.phone} · ${c.typeLabel}'),
+                    subtitle: Text(
+                      '${c.phone} · ${c.typeLabel} · ${c.approvalStatus}',
+                    ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (c.approvalStatus == 'PENDIENTE')
+                          IconButton(
+                            icon: const Icon(
+                              Icons.check_circle_outline,
+                              color: AppColors.success,
+                              size: 20,
+                            ),
+                            tooltip: 'Aprobar',
+                            onPressed: () => _reviewContact(
+                              context,
+                              ref,
+                              c.id,
+                              approve: true,
+                            ),
+                          ),
+                        if (c.approvalStatus == 'PENDIENTE')
+                          IconButton(
+                            icon: const Icon(
+                              Icons.cancel_outlined,
+                              color: AppColors.warning,
+                              size: 20,
+                            ),
+                            tooltip: 'Rechazar',
+                            onPressed: () => _reviewContact(
+                              context,
+                              ref,
+                              c.id,
+                              approve: false,
+                            ),
+                          ),
                         IconButton(
                           icon: const Icon(Icons.edit_outlined,
                               color: AppColors.primaryGreen, size: 20),
@@ -918,6 +950,35 @@ class ManageContactsScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _reviewContact(
+    BuildContext context,
+    WidgetRef ref,
+    int contactId, {
+    required bool approve,
+  }) async {
+    try {
+      final ds = ref.read(contactsDataSourceProvider);
+      await ds.reviewContact(id: contactId, approve: approve);
+      ref.invalidate(contactsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(approve ? 'Contacto aprobado' : 'Contacto rechazado'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo actualizar estado: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _deleteContact(
