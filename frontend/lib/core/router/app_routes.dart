@@ -13,10 +13,12 @@ class AppRoutes {
 
   // Shell de prestador
   static const String providerDashboard = '/provider/dashboard';
+  static const String providerContacts = '/provider/contacts';
   static const String registerProvider = '/provider/register';
 
   // Shell de domiciliario
   static const String delivererDashboard = '/deliverer/dashboard';
+  static const String delivererContacts = '/deliverer/contacts';
   static const String myDeliveries = '/deliverer/my-deliveries';
   static const String financialRecords = '/deliverer/records';
 

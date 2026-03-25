@@ -7,6 +7,8 @@ class Contact(models.Model):
         EMERGENCIA = 'EMERGENCIA', 'Emergencia'
         PROFESIONAL = 'PROFESIONAL', 'Profesional'
         COMERCIO = 'COMERCIO', 'Comercio'
+        CONTACTO = 'CONTACTO', 'Contacto'
+        SERVICIO = 'SERVICIO', 'Servicio'
         OTRO = 'OTRO', 'Otro'
 
     class ApprovalStatus(models.TextChoices):

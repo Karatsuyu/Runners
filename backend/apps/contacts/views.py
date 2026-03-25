@@ -43,6 +43,8 @@ class ContactSerializer(drf_serializers.ModelSerializer):
             Contact.ContactType.EMERGENCIA: 'emergency',
             Contact.ContactType.PROFESIONAL: 'professional',
             Contact.ContactType.COMERCIO: 'commerce',
+            Contact.ContactType.CONTACTO: 'contacto',
+            Contact.ContactType.SERVICIO: 'servicio',
         }
         return mapping.get(obj.contact_type, 'other')
 
@@ -62,10 +64,14 @@ class ContactSerializer(drf_serializers.ModelSerializer):
             'emergency': Contact.ContactType.EMERGENCIA,
             'professional': Contact.ContactType.PROFESIONAL,
             'commerce': Contact.ContactType.COMERCIO,
+            'contacto': Contact.ContactType.CONTACTO,
+            'servicio': Contact.ContactType.SERVICIO,
             'other': Contact.ContactType.OTRO,
             Contact.ContactType.EMERGENCIA: Contact.ContactType.EMERGENCIA,
             Contact.ContactType.PROFESIONAL: Contact.ContactType.PROFESIONAL,
             Contact.ContactType.COMERCIO: Contact.ContactType.COMERCIO,
+            Contact.ContactType.CONTACTO: Contact.ContactType.CONTACTO,
+            Contact.ContactType.SERVICIO: Contact.ContactType.SERVICIO,
             Contact.ContactType.OTRO: Contact.ContactType.OTRO,
         }
         if selected_type:
@@ -77,18 +83,37 @@ class ContactSerializer(drf_serializers.ModelSerializer):
             attrs['contact_type'] = mapped
         return attrs
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+
+        if instance.contact_type == Contact.ContactType.SERVICIO:
+            is_admin = user and user.is_authenticated and user.role == user.Role.ADMIN
+            is_owner = user and user.is_authenticated and instance.owner_id == user.id
+            if not is_admin and not is_owner:
+                ret['phone'] = 'Privado'
+
+        return ret
+
 
 class ContactListView(generics.ListCreateAPIView):
     serializer_class = ContactSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['name', 'description', 'phone']
     ordering_fields = ['name', 'contact_type']
 
     def get_queryset(self):
-        queryset = Contact.objects.filter(is_active=True)
         user = self.request.user
-        if user.role != user.Role.ADMIN:
+        if not user.is_authenticated:
+            queryset = Contact.objects.filter(
+                is_active=True,
+                approval_status=Contact.ApprovalStatus.APROBADO,
+            )
+        elif user.role == user.Role.ADMIN:
+            queryset = Contact.objects.filter(is_active=True)
+        else:
             queryset = (
                 Contact.objects.filter(
                     is_active=True,
@@ -96,6 +121,7 @@ class ContactListView(generics.ListCreateAPIView):
                 )
                 | Contact.objects.filter(owner=user)
             ).distinct()
+
         contact_type = self.request.query_params.get('type')
         if contact_type:
             query_mapping = {
@@ -111,8 +137,15 @@ class ContactListView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
+        
+        # Validación de unicidad
+        if Contact.objects.filter(owner=user).exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'detail': 'Ya tienes un contacto creado. Solo se permite uno por usuario.'})
+
         if user.role == user.Role.ADMIN:
             serializer.save(
+                owner=user,
                 approval_status=Contact.ApprovalStatus.APROBADO,
                 reviewed_by=user,
                 reviewed_at=timezone.now(),
@@ -127,10 +160,15 @@ class ContactListView(generics.ListCreateAPIView):
 class ContactDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
+        if not user.is_authenticated:
+            return Contact.objects.filter(
+                is_active=True,
+                approval_status=Contact.ApprovalStatus.APROBADO,
+            )
         if user.role == user.Role.ADMIN:
             return Contact.objects.all()
         return Contact.objects.filter(owner=user)

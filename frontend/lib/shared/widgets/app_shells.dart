@@ -55,7 +55,7 @@ class ProviderShell extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final tabs = [
       _NavTab(AppRoutes.providerDashboard, Icons.dashboard_rounded, 'Mi Panel'),
-      _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
+      _NavTab(AppRoutes.providerContacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int idx = tabs.indexWhere((t) => location.startsWith(t.route));
     return Scaffold(
@@ -86,7 +86,7 @@ class DelivererShell extends StatelessWidget {
       _NavTab(AppRoutes.delivererDashboard, Icons.dashboard_rounded, 'Mi Panel'),
       _NavTab(AppRoutes.myDeliveries, Icons.delivery_dining_rounded, 'Mis Domicilios'),
       _NavTab(AppRoutes.financialRecords, Icons.account_balance_wallet_rounded, 'Finanzas'),
-      _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
+      _NavTab(AppRoutes.delivererContacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int idx = tabs.indexWhere((t) => location.startsWith(t.route));
     return Scaffold(

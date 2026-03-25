@@ -102,27 +102,47 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     subtitle: 'No hay contactos para mostrar',
                   );
                 }
-                return RefreshIndicator(
-                  color: AppColors.primaryGreen,
-                  onRefresh: () async => ref.invalidate(contactsProvider),
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 10,
-                      mainAxisSpacing: 10,
-                      childAspectRatio: 0.75,
-                    ),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) =>
-                        _ContactTile(
-                          contact: filtered[i],
+                  return RefreshIndicator(
+                    color: AppColors.primaryGreen,
+                    onRefresh: () async => ref.invalidate(contactsProvider),
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(12),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 0.75,
+                      ),
+                      itemCount: isGuest ? filtered.length : filtered.length + 1,
+                      itemBuilder: (context, i) {
+                        if (!isGuest && i == 0) {
+                          return _AddContactCard(onTap: () {
+                            final myContact = (currentUser == null)
+                                ? null
+                                : contacts.cast<ContactModel?>().firstWhere(
+                                      (c) => c?.ownerId == currentUser.id,
+                                      orElse: () => null,
+                                    );
+                            if (myContact != null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ya tienes un registro creado')),
+                              );
+                            } else {
+                              _openCreateContactDialog();
+                            }
+                          });
+                        }
+
+                        final contactIndex = isGuest ? i : i - 1;
+                        return _ContactTile(
+                          contact: filtered[contactIndex],
                           isCurrentUserOwner: currentUser != null &&
-                              filtered[i].ownerId == currentUser.id,
-                        ),
-                  ),
-                );
+                              filtered[contactIndex].ownerId == currentUser.id,
+                        );
+                      },
+                    ),
+                  );
               },
             ),
           ),
@@ -179,6 +199,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     final phoneCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final descriptionCtrl = TextEditingController();
+    final typeCtrl = TextEditingController(text: 'contacto');
     final formKey = GlobalKey<FormState>();
     final picker = ImagePicker();
     XFile? pickedImage;
@@ -255,6 +276,33 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                       labelText: 'Qué haces / descripción',
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: typeCtrl.text,
+                    decoration: const InputDecoration(labelText: 'Tipo de Registro'),
+                    items: const [
+                      DropdownMenuItem(value: 'contacto', child: Text('Contacto (Público)')),
+                      DropdownMenuItem(value: 'servicio', child: Text('Servicio (Privado)')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDialogState(() {
+                          typeCtrl.text = val;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    typeCtrl.text == 'contacto' 
+                        ? '* Tu número de teléfono.'
+                        : '* Tu número de teléfono.',
+                    style: TextStyle(
+                      fontSize: 12, 
+                      color: typeCtrl.text == 'contacto' ? AppColors.warning : AppColors.primaryGreen,
+                      fontStyle: FontStyle.italic
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -279,6 +327,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                             ? null
                             : descriptionCtrl.text.trim(),
                         imagePath: pickedImage?.path,
+                        type: typeCtrl.text,
                       );
                   ref.invalidate(contactsProvider);
                   if (dialogContext.mounted) {
@@ -538,6 +587,31 @@ class _ContactTile extends StatelessWidget {
         Icons.person_rounded,
         size: 56,
         color: AppColors.primaryGreen,
+      ),
+    );
+  }
+}
+
+class _AddContactCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddContactCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        clipBehavior: Clip.antiAlias,
+        elevation: 1.5,
+        color: AppColors.primaryGreen.withValues(alpha: 0.08),
+        child: const Center(
+          child: CircleAvatar(
+            radius: 30,
+            backgroundColor: AppColors.primaryGreen,
+            child: Icon(Icons.add, color: Colors.white, size: 30),
+          ),
+        ),
       ),
     );
   }
