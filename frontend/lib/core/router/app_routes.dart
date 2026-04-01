@@ -2,12 +2,15 @@ class AppRoutes {
   static const String splash = '/';
   static const String login = '/login';
   static const String register = '/register';
+  static const String forgotPassword = '/forgot-password';
+  static const String profile = '/profile';
 
   // Shell de cliente
   static const String store = '/client/store';
   static const String services = '/client/services';
   static const String deliveries = '/client/deliveries';
   static const String contacts = '/client/contacts';
+  static const String clientProfile = '/client/profile';
   static const String orderHistory = '/client/orders';
   static const String orderConfirm = '/client/order-confirm';
 

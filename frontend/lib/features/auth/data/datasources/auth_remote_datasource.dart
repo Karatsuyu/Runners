@@ -7,8 +7,21 @@ abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> login(String email, String password);
   Future<Map<String, dynamic>> register(Map<String, String> data);
   Future<UserModel> getProfile();
-  Future<UserModel> updateProfile(Map<String, String> data);
+  Future<UserModel> updateProfile({
+    required String firstName,
+    required String lastName,
+    String? phone,
+    String? username,
+    String? profileImagePath,
+  });
   Future<void> logout(String refreshToken);
+  Future<void> requestPasswordResetCode(String email);
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPassword2,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -24,7 +37,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _handleError(e, isAuthRequest: true);
     }
   }
 
@@ -34,7 +47,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final response = await _dio.post(ApiConstants.register, data: data);
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
-      throw _handleError(e);
+      throw _handleError(e, isAuthRequest: true);
     }
   }
 
@@ -49,9 +62,34 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> updateProfile(Map<String, String> data) async {
+  Future<UserModel> updateProfile({
+    required String firstName,
+    required String lastName,
+    String? phone,
+    String? username,
+    String? profileImagePath,
+  }) async {
     try {
-      final response = await _dio.patch(ApiConstants.profile, data: data);
+      final payload = <String, dynamic>{
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone': phone?.trim() ?? '',
+        'username': username?.trim() ?? '',
+      };
+
+      if (profileImagePath != null && profileImagePath.trim().isNotEmpty) {
+        final normalized = profileImagePath.replaceAll('\\', '/');
+        final fileName = normalized.split('/').last;
+        payload['profile_image'] = await MultipartFile.fromFile(
+          profileImagePath,
+          filename: fileName,
+        );
+      }
+
+      final response = await _dio.patch(
+        ApiConstants.profile,
+        data: FormData.fromMap(payload),
+      );
       return UserModel.fromJson(response.data as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _handleError(e);
@@ -67,7 +105,41 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     }
   }
 
-  Exception _handleError(DioException e) {
+  @override
+  Future<void> requestPasswordResetCode(String email) async {
+    try {
+      await _dio.post(
+        ApiConstants.passwordResetRequest,
+        data: {'email': email},
+      );
+    } on DioException catch (e) {
+      throw _handleError(e, isAuthRequest: true);
+    }
+  }
+
+  @override
+  Future<void> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPassword2,
+  }) async {
+    try {
+      await _dio.post(
+        ApiConstants.passwordResetConfirm,
+        data: {
+          'email': email,
+          'code': code,
+          'new_password': newPassword,
+          'new_password2': newPassword2,
+        },
+      );
+    } on DioException catch (e) {
+      throw _handleError(e, isAuthRequest: true);
+    }
+  }
+
+  Exception _handleError(DioException e, {bool isAuthRequest = false}) {
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout ||
         e.type == DioExceptionType.unknown ||
@@ -75,6 +147,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return NetworkException();
     }
     if (e.response?.statusCode == 401) {
+      if (isAuthRequest) {
+        return ServerException(
+          message:
+              _extractMessage(e.response?.data) ??
+              'Credenciales inválidas. Verifica tus datos.',
+          statusCode: e.response?.statusCode,
+        );
+      }
       return UnauthorizedException();
     }
     if (e.response?.statusCode == 400) {
@@ -91,7 +171,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   String? _extractMessage(dynamic data) {
     if (data == null) return null;
-    if (data is Map) return data['detail']?.toString() ?? data['message']?.toString();
+    if (data is Map)
+      return data['detail']?.toString() ?? data['message']?.toString();
     return data.toString();
   }
 }

@@ -5,7 +5,9 @@ import '../router/app_routes.dart';
 import '../../features/auth/domain/entities/user_entity.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/profile_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/store/presentation/screens/store_screens.dart';
 import '../../features/store/presentation/screens/order_confirm_screen.dart';
@@ -35,7 +37,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isGuest = authState.isGuest;
       final location = state.matchedLocation;
 
-      final publicRoutes = [AppRoutes.splash, AppRoutes.login, AppRoutes.register];
+      final publicRoutes = [
+        AppRoutes.splash,
+        AppRoutes.login,
+        AppRoutes.register,
+        AppRoutes.forgotPassword,
+      ];
       final isPublic = publicRoutes.contains(location);
       final isClientRoute = location.startsWith('/client/');
       final guestBlockedRoutes = [
@@ -43,8 +50,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         AppRoutes.orderHistory,
         AppRoutes.orderConfirm,
       ];
-      final isGuestBlockedRoute =
-          guestBlockedRoutes.any((route) => location.startsWith(route));
+      final isGuestBlockedRoute = guestBlockedRoutes.any(
+        (route) => location.startsWith(route),
+      );
 
       if (!isAuth && !isGuest && !isPublic) return AppRoutes.login;
 
@@ -72,6 +80,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
       ),
 
       // ── Client Shell ───────────────────────────────────────────────────
@@ -111,6 +127,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.contacts,
             builder: (context, state) => const ContactsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.clientProfile,
+            builder: (context, state) => const ProfileScreen(),
           ),
           GoRoute(
             path: AppRoutes.orderHistory,

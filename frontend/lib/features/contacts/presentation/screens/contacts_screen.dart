@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/router/app_routes.dart';
+import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../store/presentation/providers/store_provider.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_loading.dart';
@@ -20,6 +24,171 @@ class ContactsScreen extends ConsumerStatefulWidget {
 class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   final _searchController = TextEditingController();
 
+  Future<bool> _openEditProfileDialog(UserEntity? user) async {
+    final firstNameController = TextEditingController(
+      text: user?.firstName ?? '',
+    );
+    final lastNameController = TextEditingController(
+      text: user?.lastName ?? '',
+    );
+    final phoneController = TextEditingController(text: user?.phone ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Editar perfil'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lastNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Apellidos'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Teléfono'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final firstName = firstNameController.text.trim();
+                final lastName = lastNameController.text.trim();
+                if (firstName.isEmpty || lastName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nombre y apellidos son obligatorios'),
+                    ),
+                  );
+                  return;
+                }
+
+                final ok = await ref
+                    .read(authProvider.notifier)
+                    .updateProfile(
+                      firstName: firstName,
+                      lastName: lastName,
+                      phone: phoneController.text.trim(),
+                    );
+                if (!dialogContext.mounted) return;
+
+                if (ok) {
+                  Navigator.of(dialogContext).pop(true);
+                } else {
+                  final error =
+                      ref.read(authProvider).error ??
+                      'No fue posible actualizar el perfil';
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(error)));
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    firstNameController.dispose();
+    lastNameController.dispose();
+    phoneController.dispose();
+    return result ?? false;
+  }
+
+  Future<void> _openProfileMenu() async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final isGuest = authState.isGuest;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.person_outline),
+                  ),
+                  title: Text(
+                    user?.fullName.isNotEmpty == true
+                        ? user!.fullName
+                        : (isGuest ? 'Modo invitado' : 'Mi perfil'),
+                  ),
+                  subtitle: Text(user?.email ?? 'Sin correo'),
+                ),
+                if (!isGuest)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Editar perfil'),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      if (mounted) {
+                        context.push(AppRoutes.clientProfile);
+                      }
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    isGuest ? Icons.login_rounded : Icons.logout,
+                    color: Colors.red,
+                  ),
+                  title: Text(
+                    isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    if (!isGuest) {
+                      await ref.read(authProvider.notifier).logout();
+                    }
+                    if (mounted) {
+                      context.go(AppRoutes.login);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _goToCart() {
+    final authState = ref.read(authProvider);
+    if (authState.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes iniciar sesión para realizar compras.'),
+        ),
+      );
+      context.go(AppRoutes.login);
+      return;
+    }
+    context.go('/client/cart');
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -29,6 +198,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
   @override
   Widget build(BuildContext context) {
     final contactsAsync = ref.watch(contactsProvider);
+    final cart = ref.watch(cartProvider);
     final authState = ref.watch(authProvider);
     final currentUser = authState.user;
     final isAdmin = currentUser?.isAdmin ?? false;
@@ -38,10 +208,38 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'Perfil',
+          onPressed: _openProfileMenu,
+        ),
         title: const Text('Contactos'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined),
+                onPressed: _goToCart,
+              ),
+              if (cart.isNotEmpty)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: CircleAvatar(
+                    radius: 9,
+                    backgroundColor: Colors.red,
+                    child: Text(
+                      '${cart.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -102,47 +300,52 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     subtitle: 'No hay contactos para mostrar',
                   );
                 }
-                  return RefreshIndicator(
-                    color: AppColors.primaryGreen,
-                    onRefresh: () async => ref.invalidate(contactsProvider),
-                    child: GridView.builder(
-                      padding: const EdgeInsets.all(12),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.75,
-                      ),
-                      itemCount: isGuest ? filtered.length : filtered.length + 1,
-                      itemBuilder: (context, i) {
-                        if (!isGuest && i == 0) {
-                          return _AddContactCard(onTap: () {
+                return RefreshIndicator(
+                  color: AppColors.primaryGreen,
+                  onRefresh: () async => ref.invalidate(contactsProvider),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.75,
+                        ),
+                    itemCount: isGuest ? filtered.length : filtered.length + 1,
+                    itemBuilder: (context, i) {
+                      if (!isGuest && i == 0) {
+                        return _AddContactCard(
+                          onTap: () {
                             final myContact = (currentUser == null)
                                 ? null
                                 : contacts.cast<ContactModel?>().firstWhere(
-                                      (c) => c?.ownerId == currentUser.id,
-                                      orElse: () => null,
-                                    );
+                                    (c) => c?.ownerId == currentUser.id,
+                                    orElse: () => null,
+                                  );
                             if (myContact != null) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Ya tienes un registro creado')),
+                                const SnackBar(
+                                  content: Text('Ya tienes un registro creado'),
+                                ),
                               );
                             } else {
                               _openCreateContactDialog();
                             }
-                          });
-                        }
-
-                        final contactIndex = isGuest ? i : i - 1;
-                        return _ContactTile(
-                          contact: filtered[contactIndex],
-                          isCurrentUserOwner: currentUser != null &&
-                              filtered[contactIndex].ownerId == currentUser.id,
+                          },
                         );
-                      },
-                    ),
-                  );
+                      }
+
+                      final contactIndex = isGuest ? i : i - 1;
+                      return _ContactTile(
+                        contact: filtered[contactIndex],
+                        isCurrentUserOwner:
+                            currentUser != null &&
+                            filtered[contactIndex].ownerId == currentUser.id,
+                      );
+                    },
+                  ),
+                );
               },
             ),
           ),
@@ -163,9 +366,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                 final myContact = (currentUser == null)
                     ? null
                     : contacts.cast<ContactModel?>().firstWhere(
-                          (c) => c?.ownerId == currentUser.id,
-                          orElse: () => null,
-                        );
+                        (c) => c?.ownerId == currentUser.id,
+                        orElse: () => null,
+                      );
                 return FloatingActionButton.extended(
                   backgroundColor: AppColors.primaryGreen,
                   foregroundColor: Colors.white,
@@ -229,7 +432,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     },
                     child: CircleAvatar(
                       radius: 38,
-                      backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.12),
+                      backgroundColor: AppColors.primaryGreen.withValues(
+                        alpha: 0.12,
+                      ),
                       backgroundImage: pickedImage != null
                           ? FileImage(File(pickedImage!.path))
                           : null,
@@ -244,14 +449,18 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   const SizedBox(height: 6),
                   const Text(
                     'Seleccionar foto (cámara o galería)',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(labelText: 'Nombre'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Ingresa un nombre' : null,
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Ingresa un nombre'
+                        : null,
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -266,7 +475,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   TextFormField(
                     controller: emailCtrl,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email (opcional)'),
+                    decoration: const InputDecoration(
+                      labelText: 'Email (opcional)',
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -279,10 +490,18 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
                     value: typeCtrl.text,
-                    decoration: const InputDecoration(labelText: 'Tipo de Registro'),
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Registro',
+                    ),
                     items: const [
-                      DropdownMenuItem(value: 'contacto', child: Text('Contacto (Público)')),
-                      DropdownMenuItem(value: 'servicio', child: Text('Servicio (Privado)')),
+                      DropdownMenuItem(
+                        value: 'contacto',
+                        child: Text('Contacto (Público)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'servicio',
+                        child: Text('Servicio (Privado)'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) {
@@ -294,13 +513,15 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    typeCtrl.text == 'contacto' 
+                    typeCtrl.text == 'contacto'
                         ? '* Tu número de teléfono.'
                         : '* Tu número de teléfono.',
                     style: TextStyle(
-                      fontSize: 12, 
-                      color: typeCtrl.text == 'contacto' ? AppColors.warning : AppColors.primaryGreen,
-                      fontStyle: FontStyle.italic
+                      fontSize: 12,
+                      color: typeCtrl.text == 'contacto'
+                          ? AppColors.warning
+                          : AppColors.primaryGreen,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
@@ -319,7 +540,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                   final effectiveEmail = emailCtrl.text.trim().isNotEmpty
                       ? emailCtrl.text.trim()
                       : authUser?.email;
-                  await ref.read(contactsActionsProvider).addManualContact(
+                  await ref
+                      .read(contactsActionsProvider)
+                      .addManualContact(
                         name: nameCtrl.text.trim(),
                         phone: phoneCtrl.text.trim(),
                         email: effectiveEmail,
@@ -369,8 +592,8 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
           final ImageProvider<Object>? imageProvider = pickedImage != null
               ? FileImage(File(pickedImage!.path))
               : (contact.imageUrl != null && contact.imageUrl!.isNotEmpty
-                  ? NetworkImage(contact.imageUrl!)
-                  : null);
+                    ? NetworkImage(contact.imageUrl!)
+                    : null);
           return AlertDialog(
             title: const Text('Editar mi contacto'),
             content: Form(
@@ -392,25 +615,32 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                     },
                     child: CircleAvatar(
                       radius: 38,
-                      backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.12),
+                      backgroundColor: AppColors.primaryGreen.withValues(
+                        alpha: 0.12,
+                      ),
                       backgroundImage: imageProvider,
-                      child: pickedImage == null &&
-                              (contact.imageUrl == null || contact.imageUrl!.isEmpty)
-                          ? const Icon(Icons.add_a_photo_outlined, color: AppColors.primaryGreen)
+                      child:
+                          pickedImage == null &&
+                              (contact.imageUrl == null ||
+                                  contact.imageUrl!.isEmpty)
+                          ? const Icon(
+                              Icons.add_a_photo_outlined,
+                              color: AppColors.primaryGreen,
+                            )
                           : null,
                     ),
                   ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Teléfono'),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Ingresa un teléfono'
-                      : null,
-                ),
-              ],
-            ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: phoneCtrl,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: 'Teléfono'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Ingresa un teléfono'
+                        : null,
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -421,7 +651,9 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   try {
-                    await ref.read(contactsActionsProvider).updateOwnContact(
+                    await ref
+                        .read(contactsActionsProvider)
+                        .updateOwnContact(
                           contactId: contact.id,
                           phone: phoneCtrl.text.trim(),
                           imagePath: pickedImage?.path,
@@ -481,10 +713,7 @@ class _ContactsScreenState extends ConsumerState<ContactsScreen> {
 class _ContactTile extends StatelessWidget {
   final ContactModel contact;
   final bool isCurrentUserOwner;
-  const _ContactTile({
-    required this.contact,
-    required this.isCurrentUserOwner,
-  });
+  const _ContactTile({required this.contact, required this.isCurrentUserOwner});
 
   Future<void> _call() async {
     final uri = Uri(scheme: 'tel', path: contact.phone);
@@ -517,10 +746,7 @@ class _ContactTile extends StatelessWidget {
               contact.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
             ),
           ),
           if (isCurrentUserOwner && !contact.isApproved)

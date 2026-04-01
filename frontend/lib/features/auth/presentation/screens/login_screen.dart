@@ -27,6 +27,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _loadRememberedCredentials();
+  }
+
+  Future<void> _loadRememberedCredentials() async {
+    final storage = ref.read(secureStorageProvider);
+    final rememberMeEnabled = await storage.isRememberMeEnabled();
+
+    if (!mounted) return;
+
+    if (!rememberMeEnabled) {
+      setState(() => _rememberMe = false);
+      return;
+    }
+
+    final rememberedEmail = await storage.getRememberedEmail();
+    final rememberedPassword = await storage.getRememberedPassword();
+
+    if (!mounted) return;
+
+    setState(() {
+      _rememberMe = true;
+      _emailCtrl.text = rememberedEmail ?? '';
+      _passCtrl.text = rememberedPassword ?? '';
+    });
+  }
+
+  Future<void> _onRememberMeChanged(bool value) async {
+    setState(() => _rememberMe = value);
+
+    if (!value) {
+      final storage = ref.read(secureStorageProvider);
+      await storage.clearRememberedCredentials();
+    }
   }
 
   @override
@@ -41,7 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final success = await ref
         .read(authProvider.notifier)
-        .login(_emailCtrl.text.trim(), _passCtrl.text);
+        .login(_emailCtrl.text.trim(), _passCtrl.text, rememberMe: _rememberMe);
 
     if (!mounted || !success) return;
 
@@ -116,10 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       },
       transitionBuilder: (context, animation, _, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -180,9 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
           Positioned.fill(
-            child: Container(
-              color: const Color.fromRGBO(255, 255, 255, 0.18),
-            ),
+            child: Container(color: const Color.fromRGBO(255, 255, 255, 0.18)),
           ),
           SingleChildScrollView(
             padding: EdgeInsets.only(
@@ -228,7 +256,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.red.shade200),
+                                  border: Border.all(
+                                    color: Colors.red.shade200,
+                                  ),
                                 ),
                                 child: Text(
                                   authState.error!,
@@ -303,7 +333,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                     value: _rememberMe,
                                     activeColor: AppColors.primaryGreen,
                                     onChanged: (value) {
-                                      setState(() => _rememberMe = value ?? false);
+                                      _onRememberMeChanged(value ?? false);
                                     },
                                   ),
                                 ),
@@ -320,13 +350,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             TextButton(
                               style: linkStyle,
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Próximamente podrás recuperar tu contraseña desde aquí.',
-                                    ),
-                                  ),
-                                );
+                                context.go(AppRoutes.forgotPassword);
                               },
                               child: const Text(
                                 '¿Olvidaste tu contraseña?',
@@ -346,7 +370,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               children: [
                                 TextButton(
                                   style: linkStyle,
-                                  onPressed: () => context.go(AppRoutes.register),
+                                  onPressed: () =>
+                                      context.go(AppRoutes.register),
                                   child: const Text(
                                     'Registrarse',
                                     style: TextStyle(

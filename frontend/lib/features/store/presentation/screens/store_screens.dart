@@ -43,9 +43,11 @@ class StoreScreen extends ConsumerWidget {
                   leading: const CircleAvatar(
                     child: Icon(Icons.person_outline),
                   ),
-                  title: Text(user?.fullName.isNotEmpty == true
-                      ? user!.fullName
-                      : (isGuest ? 'Modo invitado' : 'Mi perfil')),
+                  title: Text(
+                    user?.fullName.isNotEmpty == true
+                        ? user!.fullName
+                        : (isGuest ? 'Modo invitado' : 'Mi perfil'),
+                  ),
                   subtitle: Text(user?.email ?? 'Sin correo'),
                 ),
                 if (!isGuest)
@@ -54,11 +56,8 @@ class StoreScreen extends ConsumerWidget {
                     title: const Text('Editar perfil'),
                     onTap: () async {
                       Navigator.of(sheetContext).pop();
-                      final updated = await _openEditProfileDialog(context, ref, user);
-                      if (updated && context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Perfil actualizado')),
-                        );
+                      if (context.mounted) {
+                        context.push(AppRoutes.clientProfile);
                       }
                     },
                   ),
@@ -94,8 +93,12 @@ class StoreScreen extends ConsumerWidget {
     WidgetRef ref,
     UserEntity? user,
   ) async {
-    final firstNameController = TextEditingController(text: user?.firstName ?? '');
-    final lastNameController = TextEditingController(text: user?.lastName ?? '');
+    final firstNameController = TextEditingController(
+      text: user?.firstName ?? '',
+    );
+    final lastNameController = TextEditingController(
+      text: user?.lastName ?? '',
+    );
     final phoneController = TextEditingController(text: user?.phone ?? '');
 
     final result = await showDialog<bool>(
@@ -143,7 +146,9 @@ class StoreScreen extends ConsumerWidget {
                   return;
                 }
 
-                final ok = await ref.read(authProvider.notifier).updateProfile(
+                final ok = await ref
+                    .read(authProvider.notifier)
+                    .updateProfile(
                       firstName: firstName,
                       lastName: lastName,
                       phone: phoneController.text.trim(),
@@ -153,11 +158,12 @@ class StoreScreen extends ConsumerWidget {
                 if (ok) {
                   Navigator.of(dialogContext).pop(true);
                 } else {
-                  final error = ref.read(authProvider).error ??
+                  final error =
+                      ref.read(authProvider).error ??
                       'No fue posible actualizar el perfil';
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(error)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(error)));
                 }
               },
               child: const Text('Guardar'),
@@ -213,8 +219,7 @@ class StoreScreen extends ConsumerWidget {
                     backgroundColor: Colors.red,
                     child: Text(
                       '${cart.length}',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 10),
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
                     ),
                   ),
                 ),
@@ -227,26 +232,28 @@ class StoreScreen extends ConsumerWidget {
           // Chips de categorías
           categoriesAsync.when(
             loading: () => const SizedBox(
-                height: 56,
-                child: Center(child: AppLoading(size: 24))),
+              height: 56,
+              child: Center(child: AppLoading(size: 24)),
+            ),
             error: (_, __) => const SizedBox(),
             data: (categories) => SizedBox(
               height: 56,
               child: ListView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
                       label: const Text('Todos'),
                       selected: selectedCategory == null,
-                      selectedColor:
-                          AppColors.primaryGreen.withAlpha(30),
-                      onSelected: (_) => ref
-                          .read(selectedCategoryProvider.notifier)
-                          .state = null,
+                      selectedColor: AppColors.primaryGreen.withAlpha(30),
+                      onSelected: (_) =>
+                          ref.read(selectedCategoryProvider.notifier).state =
+                              null,
                     ),
                   ),
                   ...categories.map(
@@ -255,11 +262,10 @@ class StoreScreen extends ConsumerWidget {
                       child: ChoiceChip(
                         label: Text(cat.name),
                         selected: selectedCategory == cat.id,
-                        selectedColor:
-                            AppColors.primaryGreen.withAlpha(30),
-                        onSelected: (_) => ref
-                            .read(selectedCategoryProvider.notifier)
-                            .state = cat.id,
+                        selectedColor: AppColors.primaryGreen.withAlpha(30),
+                        onSelected: (_) =>
+                            ref.read(selectedCategoryProvider.notifier).state =
+                                cat.id,
                       ),
                     ),
                   ),
@@ -283,8 +289,7 @@ class StoreScreen extends ConsumerWidget {
                           'No hay comercios disponibles en esta categoría.',
                     )
                   : RefreshIndicator(
-                      onRefresh: () async =>
-                          ref.invalidate(commercesProvider),
+                      onRefresh: () async => ref.invalidate(commercesProvider),
                       child: ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: commerces.length,
@@ -294,23 +299,29 @@ class StoreScreen extends ConsumerWidget {
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor:
-                                    AppColors.primaryGreen.withAlpha(20),
+                                backgroundColor: AppColors.primaryGreen
+                                    .withAlpha(20),
                                 child: const Icon(
-                                    Icons.store_rounded,
-                                    color: AppColors.primaryGreen),
+                                  Icons.store_rounded,
+                                  color: AppColors.primaryGreen,
+                                ),
                               ),
-                              title: Text(c.name,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
-                              subtitle: Text(c.description,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis),
+                              title: Text(
+                                c.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                c.description,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                               trailing: const Icon(
-                                  Icons.arrow_forward_ios_rounded,
-                                  size: 16),
-                              onTap: () =>
-                                  context.go('/client/store/${c.id}'),
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                              ),
+                              onTap: () => context.go('/client/store/${c.id}'),
                             ),
                           );
                         },
@@ -330,8 +341,7 @@ class StoreScreen extends ConsumerWidget {
           context.go('/client/orders');
         },
         icon: const Icon(Icons.history, color: Colors.white),
-        label: const Text('Mis Pedidos',
-            style: TextStyle(color: Colors.white)),
+        label: const Text('Mis Pedidos', style: TextStyle(color: Colors.white)),
       ),
     );
   }
@@ -347,8 +357,7 @@ class CommerceDetailScreen extends ConsumerWidget {
     final productsAsync = ref.watch(commerceProductsProvider(commerceId));
     final cart = ref.watch(cartProvider);
     final isGuest = ref.watch(authProvider).isGuest;
-    final currency =
-        NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
+    final currency = NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
 
     return Scaffold(
       appBar: AppBar(
@@ -373,9 +382,10 @@ class CommerceDetailScreen extends ConsumerWidget {
                   child: CircleAvatar(
                     radius: 9,
                     backgroundColor: Colors.red,
-                    child: Text('${cart.length}',
-                        style: const TextStyle(
-                            color: Colors.white, fontSize: 10)),
+                    child: Text(
+                      '${cart.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
                   ),
                 ),
             ],
@@ -386,8 +396,7 @@ class CommerceDetailScreen extends ConsumerWidget {
         loading: () => const AppLoading(),
         error: (e, _) => AppErrorWidget(
           message: 'Error al cargar productos',
-          onRetry: () =>
-              ref.invalidate(commerceProductsProvider(commerceId)),
+          onRetry: () => ref.invalidate(commerceProductsProvider(commerceId)),
         ),
         data: (products) => products.isEmpty
             ? const AppEmptyState(
@@ -400,8 +409,7 @@ class CommerceDetailScreen extends ConsumerWidget {
                 itemCount: products.length,
                 itemBuilder: (_, i) {
                   final p = products[i];
-                  final inCart =
-                      cart.indexWhere((c) => c.productId == p.id);
+                  final inCart = cart.indexWhere((c) => c.productId == p.id);
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
                     child: Padding(
@@ -410,27 +418,35 @@ class CommerceDetailScreen extends ConsumerWidget {
                         children: [
                           CircleAvatar(
                             radius: 28,
-                            backgroundColor:
-                                AppColors.primaryGreen.withAlpha(15),
-                            child: const Icon(Icons.fastfood_rounded,
-                                color: AppColors.primaryGreen),
+                            backgroundColor: AppColors.primaryGreen.withAlpha(
+                              15,
+                            ),
+                            child: const Icon(
+                              Icons.fastfood_rounded,
+                              color: AppColors.primaryGreen,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(p.name,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  p.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                                 if (p.description.isNotEmpty)
-                                  Text(p.description,
-                                      style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis),
+                                  Text(
+                                    p.description,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 Text(
                                   currency.format(p.price),
                                   style: const TextStyle(
@@ -443,26 +459,37 @@ class CommerceDetailScreen extends ConsumerWidget {
                             ),
                           ),
                           if (!p.isAvailable)
-                            const Text('No disponible',
-                                style: TextStyle(
-                                    color: Colors.grey, fontSize: 11))
+                            const Text(
+                              'No disponible',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11,
+                              ),
+                            )
                           else if (inCart >= 0)
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.remove_circle,
-                                      color: AppColors.error),
+                                  icon: const Icon(
+                                    Icons.remove_circle,
+                                    color: AppColors.error,
+                                  ),
                                   onPressed: () => ref
                                       .read(cartProvider.notifier)
                                       .decreaseQuantity(p.id),
                                 ),
-                                Text('${cart[inCart].quantity}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold)),
+                                Text(
+                                  '${cart[inCart].quantity}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                                 IconButton(
-                                  icon: const Icon(Icons.add_circle,
-                                      color: AppColors.primaryGreen),
+                                  icon: const Icon(
+                                    Icons.add_circle,
+                                    color: AppColors.primaryGreen,
+                                  ),
                                   onPressed: () {
                                     if (isGuest) {
                                       _redirectGuestToLogin(context);
@@ -505,12 +532,18 @@ class CommerceDetailScreen extends ConsumerWidget {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primaryGreen,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 8),
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                                 minimumSize: Size.zero,
                               ),
-                              child: const Text('+',
-                                  style: TextStyle(
-                                      color: Colors.white, fontSize: 18)),
+                              child: const Text(
+                                '+',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                              ),
                             ),
                         ],
                       ),
@@ -546,7 +579,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     try {
       final cartNotifier = ref.read(cartProvider.notifier);
       final payload = cartNotifier.toOrderPayload();
-      final order = await ref.read(storeDataSourceProvider).createOrder(payload);
+      final order = await ref
+          .read(storeDataSourceProvider)
+          .createOrder(payload);
       final total = cartNotifier.total;
       ref.read(cartProvider.notifier).clearCart();
       if (mounted) {
@@ -569,8 +604,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   @override
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
-    final currency =
-        NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
+    final currency = NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
     final total = ref.read(cartProvider.notifier).total;
 
     return Scaffold(
@@ -593,8 +627,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   Container(
                     color: Colors.red.shade50,
                     padding: const EdgeInsets.all(12),
-                    child: Text(_error!,
-                        style: const TextStyle(color: AppColors.error)),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: AppColors.error),
+                    ),
                   ),
                 Expanded(
                   child: ListView.builder(
@@ -603,24 +639,30 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       final item = cart[i];
                       return ListTile(
                         title: Text(item.productName),
-                        subtitle:
-                            Text(currency.format(item.unitPrice)),
+                        subtitle: Text(currency.format(item.unitPrice)),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove_circle,
-                                  color: AppColors.error),
+                              icon: const Icon(
+                                Icons.remove_circle,
+                                color: AppColors.error,
+                              ),
                               onPressed: () => ref
                                   .read(cartProvider.notifier)
                                   .removeItem(item.productId),
                             ),
-                            Text('${item.quantity}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold)),
+                            Text(
+                              '${item.quantity}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                             IconButton(
-                              icon: const Icon(Icons.add_circle,
-                                  color: AppColors.primaryGreen),
+                              icon: const Icon(
+                                Icons.add_circle,
+                                color: AppColors.primaryGreen,
+                              ),
                               onPressed: () => ref
                                   .read(cartProvider.notifier)
                                   .addItem(
@@ -648,27 +690,31 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withAlpha(15),
-                          blurRadius: 10,
-                          offset: const Offset(0, -3))
+                        color: Colors.black.withAlpha(15),
+                        blurRadius: 10,
+                        offset: const Offset(0, -3),
+                      ),
                     ],
                   ),
                   child: Column(
                     children: [
                       Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Total:',
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold)),
+                          const Text(
+                            'Total:',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           Text(
                             currency.format(total),
                             style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryGreen),
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryGreen,
+                            ),
                           ),
                         ],
                       ),
@@ -679,7 +725,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           onPressed: _loading ? null : _confirmOrder,
                           child: _loading
                               ? const CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2)
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                )
                               : const Text('Confirmar Pedido'),
                         ),
                       ),
@@ -699,8 +747,7 @@ class OrderHistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ordersAsync = ref.watch(ordersProvider);
-    final currency =
-        NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
+    final currency = NumberFormat.simpleCurrency(locale: 'es_CO', name: 'COP');
 
     return Scaffold(
       appBar: AppBar(
@@ -720,8 +767,7 @@ class OrderHistoryScreen extends ConsumerWidget {
             ? const AppEmptyState(
                 icon: Icons.receipt_long_outlined,
                 title: 'Sin pedidos',
-                subtitle:
-                    'Aún no tienes pedidos. ¡Haz tu primer pedido!',
+                subtitle: 'Aún no tienes pedidos. ¡Haz tu primer pedido!',
               )
             : RefreshIndicator(
                 onRefresh: () async => ref.invalidate(ordersProvider),
@@ -734,35 +780,37 @@ class OrderHistoryScreen extends ConsumerWidget {
                       margin: const EdgeInsets.only(bottom: 12),
                       child: ListTile(
                         leading: CircleAvatar(
-                          backgroundColor:
-                              o.statusColor.withAlpha(30),
-                          child: Icon(Icons.receipt_rounded,
-                              color: o.statusColor),
+                          backgroundColor: o.statusColor.withAlpha(30),
+                          child: Icon(
+                            Icons.receipt_rounded,
+                            color: o.statusColor,
+                          ),
                         ),
-                        title: Text(o.commerceName,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600)),
+                        title: Text(
+                          o.commerceName,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                         subtitle: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(o.createdAt),
                             Container(
                               margin: const EdgeInsets.only(top: 4),
-                              padding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 color: o.statusColor.withAlpha(25),
-                                borderRadius:
-                                    BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 o.status,
                                 style: TextStyle(
-                                    color: o.statusColor,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600),
+                                  color: o.statusColor,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
@@ -770,8 +818,9 @@ class OrderHistoryScreen extends ConsumerWidget {
                         trailing: Text(
                           currency.format(o.total),
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryGreen),
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGreen,
+                          ),
                         ),
                       ),
                     );

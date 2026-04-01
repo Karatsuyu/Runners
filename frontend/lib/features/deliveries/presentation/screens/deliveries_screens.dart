@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/router/app_routes.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../auth/domain/entities/user_entity.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../store/presentation/providers/store_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_error_widget.dart';
@@ -27,6 +32,171 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
   final _descCtrl = TextEditingController();
   bool _loading = false;
 
+  Future<bool> _openEditProfileDialog(UserEntity? user) async {
+    final firstNameController = TextEditingController(
+      text: user?.firstName ?? '',
+    );
+    final lastNameController = TextEditingController(
+      text: user?.lastName ?? '',
+    );
+    final phoneController = TextEditingController(text: user?.phone ?? '');
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Editar perfil'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: lastNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Apellidos'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Teléfono'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final firstName = firstNameController.text.trim();
+                final lastName = lastNameController.text.trim();
+                if (firstName.isEmpty || lastName.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Nombre y apellidos son obligatorios'),
+                    ),
+                  );
+                  return;
+                }
+
+                final ok = await ref
+                    .read(authProvider.notifier)
+                    .updateProfile(
+                      firstName: firstName,
+                      lastName: lastName,
+                      phone: phoneController.text.trim(),
+                    );
+                if (!dialogContext.mounted) return;
+
+                if (ok) {
+                  Navigator.of(dialogContext).pop(true);
+                } else {
+                  final error =
+                      ref.read(authProvider).error ??
+                      'No fue posible actualizar el perfil';
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(error)));
+                }
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    firstNameController.dispose();
+    lastNameController.dispose();
+    phoneController.dispose();
+    return result ?? false;
+  }
+
+  Future<void> _openProfileMenu() async {
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    final isGuest = authState.isGuest;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.person_outline),
+                  ),
+                  title: Text(
+                    user?.fullName.isNotEmpty == true
+                        ? user!.fullName
+                        : (isGuest ? 'Modo invitado' : 'Mi perfil'),
+                  ),
+                  subtitle: Text(user?.email ?? 'Sin correo'),
+                ),
+                if (!isGuest)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('Editar perfil'),
+                    onTap: () async {
+                      Navigator.of(sheetContext).pop();
+                      if (mounted) {
+                        context.push(AppRoutes.clientProfile);
+                      }
+                    },
+                  ),
+                ListTile(
+                  leading: Icon(
+                    isGuest ? Icons.login_rounded : Icons.logout,
+                    color: Colors.red,
+                  ),
+                  title: Text(
+                    isGuest ? 'Iniciar sesión' : 'Cerrar sesión',
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: () async {
+                    Navigator.of(sheetContext).pop();
+                    if (!isGuest) {
+                      await ref.read(authProvider.notifier).logout();
+                    }
+                    if (mounted) {
+                      context.go(AppRoutes.login);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _goToCart() {
+    final authState = ref.read(authProvider);
+    if (authState.isGuest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debes iniciar sesión para realizar compras.'),
+        ),
+      );
+      context.go(AppRoutes.login);
+      return;
+    }
+    context.go('/client/cart');
+  }
+
   @override
   void dispose() {
     _pickupCtrl.dispose();
@@ -51,7 +221,9 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Domicilio solicitado! Asignando repartidor automáticamente...'),
+            content: Text(
+              '¡Domicilio solicitado! Asignando repartidor automáticamente...',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -74,14 +246,43 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
   @override
   Widget build(BuildContext context) {
     final requestsAsync = ref.watch(myDeliveryRequestsProvider);
+    final cart = ref.watch(cartProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: 'Perfil',
+          onPressed: _openProfileMenu,
+        ),
         title: const Text('Domicilios'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.shopping_cart_outlined),
+                onPressed: _goToCart,
+              ),
+              if (cart.isNotEmpty)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: CircleAvatar(
+                    radius: 9,
+                    backgroundColor: Colors.red,
+                    child: Text(
+                      '${cart.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -90,7 +291,9 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
           children: [
             // ── Request Form ──────────────────────────────────────────
             Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Form(
@@ -100,14 +303,18 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.delivery_dining, color: AppColors.primaryGreen),
+                          const Icon(
+                            Icons.delivery_dining,
+                            color: AppColors.primaryGreen,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Solicitar Domicilio',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primaryGreen,
-                            ),
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryGreen,
+                                ),
                           ),
                         ],
                       ),
@@ -123,16 +330,18 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                         controller: _pickupCtrl,
                         label: 'Dirección de recogida',
                         prefixIcon: Icons.location_on_outlined,
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Ingresa la dirección de recogida' : null,
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Ingresa la dirección de recogida'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       AppTextField(
                         controller: _deliveryCtrl,
                         label: 'Dirección de entrega',
                         prefixIcon: Icons.location_on,
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Ingresa la dirección de entrega' : null,
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Ingresa la dirección de entrega'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       AppTextField(
@@ -140,8 +349,9 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                         label: 'Descripción del pedido',
                         prefixIcon: Icons.description_outlined,
                         maxLines: 3,
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Describe qué necesitas enviar' : null,
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Describe qué necesitas enviar'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       AppButton(
@@ -161,9 +371,9 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
             // ── My Requests History ───────────────────────────────────
             Text(
               'Mis Solicitudes',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
@@ -239,7 +449,10 @@ class _DeliveryRequestCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -256,18 +469,28 @@ class _DeliveryRequestCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 6),
-            _AddressRow(icon: Icons.trip_origin_outlined, text: request.pickupAddress),
+            _AddressRow(
+              icon: Icons.trip_origin_outlined,
+              text: request.pickupAddress,
+            ),
             const SizedBox(height: 2),
             _AddressRow(icon: Icons.location_on, text: request.deliveryAddress),
             if (request.delivererName != null) ...[
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: AppColors.textSecondary,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     'Repartidor: ${request.delivererName}',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -275,7 +498,10 @@ class _DeliveryRequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(request.createdAt),
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -364,9 +590,9 @@ class DelivererDashboardScreen extends ConsumerWidget {
 
               Text(
                 'Domicilios Asignados',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
 
@@ -379,7 +605,10 @@ class DelivererDashboardScreen extends ConsumerWidget {
                 ),
                 data: (deliveries) {
                   final active = deliveries
-                      .where((d) => d.status != 'completed' && d.status != 'cancelled')
+                      .where(
+                        (d) =>
+                            d.status != 'completed' && d.status != 'cancelled',
+                      )
                       .toList();
                   if (active.isEmpty) {
                     return const AppEmptyState(
@@ -421,12 +650,17 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
   Future<void> _changeStatus(DelivererStatus newStatus) async {
     setState(() => _updating = true);
     try {
-      await ref.read(deliveriesDataSourceProvider).updateDelivererStatus(newStatus);
+      await ref
+          .read(deliveriesDataSourceProvider)
+          .updateDelivererStatus(newStatus);
       ref.invalidate(myDelivererProfileProvider);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -449,8 +683,14 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
               children: [
                 CircleAvatar(
                   radius: 28,
-                  backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.15),
-                  child: const Icon(Icons.delivery_dining, color: AppColors.primaryGreen, size: 30),
+                  backgroundColor: AppColors.primaryGreen.withValues(
+                    alpha: 0.15,
+                  ),
+                  child: const Icon(
+                    Icons.delivery_dining,
+                    color: AppColors.primaryGreen,
+                    size: 30,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -459,7 +699,10 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
                     children: [
                       Text(
                         profile.fullName,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       Text(
                         profile.phone,
@@ -469,7 +712,10 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -511,7 +757,10 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
             const SizedBox(height: 16),
 
             if (_updating)
-              const SizedBox(height: 36, child: Center(child: CircularProgressIndicator()))
+              const SizedBox(
+                height: 36,
+                child: Center(child: CircularProgressIndicator()),
+              )
             else
               Row(
                 children: DelivererStatus.values.map((s) {
@@ -525,11 +774,16 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
                           backgroundColor: isActive
                               ? _statusColor(s)
                               : Colors.transparent,
-                          foregroundColor: isActive ? Colors.white : _statusColor(s),
+                          foregroundColor: isActive
+                              ? Colors.white
+                              : _statusColor(s),
                           side: BorderSide(color: _statusColor(s)),
                           padding: const EdgeInsets.symmetric(vertical: 6),
                         ),
-                        child: Text(s.label, style: const TextStyle(fontSize: 11)),
+                        child: Text(
+                          s.label,
+                          style: const TextStyle(fontSize: 11),
+                        ),
                       ),
                     ),
                   );
@@ -557,7 +811,11 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final IconData icon;
-  const _StatCard({required this.label, required this.value, required this.icon});
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -575,7 +833,13 @@ class _StatCard extends StatelessWidget {
             value,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -587,7 +851,8 @@ class _ActiveDeliveryCard extends ConsumerStatefulWidget {
   const _ActiveDeliveryCard({required this.delivery});
 
   @override
-  ConsumerState<_ActiveDeliveryCard> createState() => _ActiveDeliveryCardState();
+  ConsumerState<_ActiveDeliveryCard> createState() =>
+      _ActiveDeliveryCardState();
 }
 
 class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
@@ -600,11 +865,19 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
         title: const Text('Confirmar entrega'),
         content: const Text('¿Confirmas que el domicilio fue entregado?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryGreen),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGreen,
+            ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Confirmar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -613,7 +886,9 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
 
     setState(() => _completing = true);
     try {
-      await ref.read(deliveriesDataSourceProvider).completeDelivery(widget.delivery.id);
+      await ref
+          .read(deliveriesDataSourceProvider)
+          .completeDelivery(widget.delivery.id);
       ref.invalidate(myDeliveriesProvider);
       ref.invalidate(myDelivererProfileProvider);
       ref.invalidate(financialRecordsProvider);
@@ -628,7 +903,10 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -656,13 +934,20 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.person_outline, size: 15, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.person_outline,
+                  size: 15,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Text(d.clientName, style: const TextStyle(fontSize: 13)),
               ],
             ),
             const SizedBox(height: 4),
-            _AddressRow(icon: Icons.trip_origin_outlined, text: d.pickupAddress),
+            _AddressRow(
+              icon: Icons.trip_origin_outlined,
+              text: d.pickupAddress,
+            ),
             const SizedBox(height: 2),
             _AddressRow(icon: Icons.location_on, text: d.deliveryAddress),
             const SizedBox(height: 10),
@@ -674,7 +959,10 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
                     ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.check_circle_outline),
                 label: const Text('Marcar como Entregado'),
@@ -784,7 +1072,10 @@ class _DeliveryHistoryCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -803,15 +1094,25 @@ class _DeliveryHistoryCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(Icons.person_outline, size: 14, color: AppColors.textSecondary),
+                const Icon(
+                  Icons.person_outline,
+                  size: 14,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Text(delivery.clientName, style: const TextStyle(fontSize: 13)),
               ],
             ),
             const SizedBox(height: 4),
-            _AddressRow(icon: Icons.trip_origin_outlined, text: delivery.pickupAddress),
+            _AddressRow(
+              icon: Icons.trip_origin_outlined,
+              text: delivery.pickupAddress,
+            ),
             const SizedBox(height: 2),
-            _AddressRow(icon: Icons.location_on, text: delivery.deliveryAddress),
+            _AddressRow(
+              icon: Icons.location_on,
+              text: delivery.deliveryAddress,
+            ),
             if (delivery.income != null || delivery.expenses != null) ...[
               const Divider(height: 16),
               Row(
@@ -838,7 +1139,10 @@ class _DeliveryHistoryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(delivery.createdAt),
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -851,7 +1155,11 @@ class _MiniStat extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _MiniStat({required this.label, required this.value, required this.color});
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -859,8 +1167,14 @@ class _MiniStat extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(fontSize: 11, color: color)),
-        Text(value,
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
       ],
     );
   }
@@ -905,7 +1219,9 @@ class FinancialRecordsScreen extends ConsumerWidget {
               loading: () => const AppLoading(),
               error: (_, __) => const SizedBox.shrink(),
               data: (profile) => Card(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 color: AppColors.primaryGreen,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -914,10 +1230,7 @@ class FinancialRecordsScreen extends ConsumerWidget {
                     children: [
                       const Text(
                         'Resumen Financiero',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -931,7 +1244,10 @@ class FinancialRecordsScreen extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Total acumulado · ${profile.completedDeliveries} entregas',
-                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
@@ -943,9 +1259,9 @@ class FinancialRecordsScreen extends ConsumerWidget {
 
             Text(
               'Registros',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
 
