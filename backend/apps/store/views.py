@@ -28,8 +28,11 @@ class CommerceListView(generics.ListCreateAPIView):
     def get_queryset(self):
         queryset = Commerce.objects.filter(is_active=True)
         category = self.request.query_params.get('category')
+        business_type = self.request.query_params.get('business_type')
         if category:
             queryset = queryset.filter(category_id=category)
+        if business_type:
+            queryset = queryset.filter(business_type=business_type)
         return queryset
 
 

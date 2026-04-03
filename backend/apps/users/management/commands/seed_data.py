@@ -37,16 +37,30 @@ class Command(BaseCommand):
 
     def _clear_data(self):
         from apps.contacts.models import Contact
-        from apps.deliveries.models import Deliverer, DeliveryRequest, FinancialRecord, SystemConfig
+        from apps.deliveries.models import (
+            Deliverer,
+            DeliveryCommerceHistory,
+            DeliveryPricingRule,
+            DeliveryRequest,
+            DeliveryZone,
+            FinancialRecord,
+            SystemConfig,
+        )
+        from apps.chat.models import ChatMessage, ChatThread
         from apps.services.models import ServiceCategory, ServiceProvider, ServiceRequest
         from apps.store.models import Category, Commerce, Product, Order, OrderItem
         from apps.users.models import User
 
         self.stdout.write('🗑  Limpiando datos anteriores...')
+        ChatMessage.objects.all().delete()
+        ChatThread.objects.all().delete()
+        DeliveryCommerceHistory.objects.all().delete()
         OrderItem.objects.all().delete()
         Order.objects.all().delete()
         FinancialRecord.objects.all().delete()
         DeliveryRequest.objects.all().delete()
+        DeliveryPricingRule.objects.all().delete()
+        DeliveryZone.objects.all().delete()
         Deliverer.objects.all().delete()
         ServiceRequest.objects.all().delete()
         ServiceProvider.objects.all().delete()
@@ -188,7 +202,7 @@ class Command(BaseCommand):
     # ── Domicilios ────────────────────────────────────────────────────────────
 
     def _seed_deliveries(self):
-        from apps.deliveries.models import Deliverer
+        from apps.deliveries.models import Deliverer, DeliveryPricingRule, DeliveryZone
 
         self.stdout.write('🛵  Creando domiciliarios...')
 
@@ -208,6 +222,48 @@ class Command(BaseCommand):
                     'assigned_number': number,
                     'status': Deliverer.Status.DISPONIBLE,
                     'work_type': work_type,
+                    'is_active': True,
+                },
+            )
+
+        self.stdout.write('🧭  Creando zonas de domicilios...')
+
+        zona_caicedonia, _ = DeliveryZone.objects.get_or_create(name='Caicedonia', defaults={'description': 'Cobertura urbana principal'})
+        zona_barragan_antes, _ = DeliveryZone.objects.get_or_create(name='Barragán (antes del puente)')
+        zona_barragan_despues, _ = DeliveryZone.objects.get_or_create(name='Barragán (después del puente)')
+        zona_condominios_barragan, _ = DeliveryZone.objects.get_or_create(name='Condominios de Barragán')
+        zona_camelia, _ = DeliveryZone.objects.get_or_create(name='La Camelia')
+        zona_club, _ = DeliveryZone.objects.get_or_create(name='Club Casa y Pesca')
+        zona_delicias, _ = DeliveryZone.objects.get_or_create(name='Delicias / Las Delicias')
+
+        self.stdout.write('💰  Creando reglas de tarifas de domicilios...')
+
+        rules = [
+            ('Recoger y entregar - Caicedonia', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_caicedonia, None, None, 1, 1, 3000, 10),
+            ('Compra sencilla - base', DeliveryPricingRule.RequestKind.COMPRA_SENCILLA, None, None, None, 1, 1, 4000, 20),
+            ('Supermercado hasta 6 productos', DeliveryPricingRule.RequestKind.SUPERMERCADO, None, 1, 6, 1, 1, 4000, 30),
+            ('Supermercado desde 7 productos', DeliveryPricingRule.RequestKind.SUPERMERCADO, None, 7, None, 1, 1, 5000, 31),
+            ('Multipunto 2 puntos', DeliveryPricingRule.RequestKind.MULTIPUNTO, None, None, None, 2, 2, 7000, 40),
+            ('Barragán antes del puente', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_barragan_antes, None, None, None, None, 10000, 50),
+            ('Barragán después del puente', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_barragan_despues, None, None, None, None, 12000, 51),
+            ('Condominios de Barragán', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_condominios_barragan, None, None, None, None, 14000, 52),
+            ('La Camelia', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_camelia, None, None, None, None, 6000, 53),
+            ('Club Casa y Pesca', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_club, None, None, None, None, 5000, 54),
+            ('Delicias / Las Delicias', DeliveryPricingRule.RequestKind.RECOGER_ENTREGAR, zona_delicias, None, None, None, None, 5000, 55),
+        ]
+
+        for name, request_kind, zone, min_items, max_items, min_points, max_points, fee_amount, priority in rules:
+            DeliveryPricingRule.objects.get_or_create(
+                name=name,
+                defaults={
+                    'request_kind': request_kind,
+                    'zone': zone,
+                    'min_items': min_items,
+                    'max_items': max_items,
+                    'min_points': min_points,
+                    'max_points': max_points,
+                    'fee_amount': fee_amount,
+                    'priority': priority,
                     'is_active': True,
                 },
             )
@@ -250,6 +306,8 @@ class Command(BaseCommand):
             ('delivery_base_fee',      '3000',  'Tarifa base por domicilio (COP)'),
             ('service_runners_fee_pct','15',   'Porcentaje de comisión de Runners en servicios'),
             ('max_delivery_radius_km', '5',    'Radio máximo de cobertura de domicilios en km'),
+            ('transfer_surcharge_threshold', '15000', 'Umbral desde el cual se cobra recargo por transferencia'),
+            ('transfer_surcharge_amount', '2000', 'Valor de recargo por transferencia a favor de Runners'),
         ]
 
         for key, value, description in configs:

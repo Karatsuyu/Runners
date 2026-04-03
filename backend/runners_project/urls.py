@@ -12,6 +12,7 @@ urlpatterns = [
         path('deliveries/', include('apps.deliveries.urls')),
         path('contacts/', include('apps.contacts.urls')),
         path('reports/', include('apps.reports.urls')),
+        path('chat/', include('apps.chat.urls')),
     ])),
 ]
 

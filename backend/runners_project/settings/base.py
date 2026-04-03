@@ -25,6 +25,7 @@ THIRD_PARTY_APPS = [
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'channels',
 ]
 
 LOCAL_APPS = [
@@ -34,6 +35,7 @@ LOCAL_APPS = [
     'apps.deliveries',
     'apps.contacts',
     'apps.reports',
+    'apps.chat',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -68,6 +70,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'runners_project.wsgi.application'
+ASGI_APPLICATION = 'runners_project.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}
 
 # Modelo de usuario personalizado
 AUTH_USER_MODEL = 'users.User'

@@ -1,23 +1,15 @@
+from datetime import timedelta
+
+from django.db.models import Count, Q, Sum
+from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from django.db.models import Count, Sum
-from django.utils import timezone
-from datetime import timedelta
-from apps.users.permissions import IsAdmin
-from apps.store.models import Order
-from apps.services.models import ServiceRequest
-from apps.deliveries.models import Deliverer, FinancialRecord
 
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from django.db.models import Count, Sum
-from django.utils import timezone
-from datetime import timedelta
-from apps.users.permissions import IsAdmin
+from apps.contacts.models import Contact
+from apps.deliveries.models import Deliverer, DeliveryRequest, FinancialRecord
+from apps.services.models import ServiceProvider, ServiceRequest
 from apps.store.models import Order
-from apps.services.models import ServiceRequest, ServiceProvider
-from apps.deliveries.models import Deliverer, FinancialRecord, DeliveryRequest
+from apps.users.permissions import IsAdmin
 
 
 @api_view(['GET'])
@@ -79,6 +71,37 @@ def sales_report(request):
 
 @api_view(['GET'])
 @permission_classes([IsAdmin])
+def deliveries_report(request):
+    """Reporte de domicilios por estado/tipo/zona."""
+    days = int(request.query_params.get('days', 30))
+    since = timezone.now() - timedelta(days=days)
+
+    deliveries = DeliveryRequest.objects.filter(created_at__gte=since)
+
+    by_source = deliveries.values('source_type').annotate(total=Count('id')).order_by('-total')
+    by_kind = deliveries.values('request_kind').annotate(total=Count('id')).order_by('-total')
+    by_zone = deliveries.values('zone__name').annotate(total=Count('id')).order_by('-total')
+
+    return Response({
+        'period_days': days,
+        'total': deliveries.count(),
+        'status': {
+            'solicitado': deliveries.filter(status='SOLICITADO').count(),
+            'aceptado': deliveries.filter(status='ACEPTADO').count(),
+            'en_camino': deliveries.filter(status='EN_CAMINO').count(),
+            'entregado': deliveries.filter(status='ENTREGADO').count(),
+            'cancelado': deliveries.filter(status='CANCELADO').count(),
+        },
+        'total_delivery_fees': float(deliveries.aggregate(Sum('delivery_fee'))['delivery_fee__sum'] or 0),
+        'total_transfer_surcharge': float(deliveries.aggregate(Sum('transfer_surcharge'))['transfer_surcharge__sum'] or 0),
+        'by_source': list(by_source),
+        'by_kind': list(by_kind),
+        'by_zone': list(by_zone),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
 def deliverers_report(request):
     """Reporte financiero de domiciliarios."""
     deliverers = Deliverer.objects.filter(is_active=True)
@@ -97,6 +120,40 @@ def deliverers_report(request):
             'runners_total_commission': float(commissions),
         })
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def finance_report(request):
+    """Reporte financiero consolidado: ingresos, egresos, rojo, azul, negro y recargos de transferencia."""
+    days = int(request.query_params.get('days', 30))
+    since = timezone.now() - timedelta(days=days)
+
+    records = FinancialRecord.objects.filter(created_at__gte=since)
+
+    by_classification = records.values('classification').annotate(total=Sum('amount'), count=Count('id')).order_by('classification')
+    by_reason = records.values('reason').annotate(total=Sum('amount'), count=Count('id')).order_by('-total')
+
+    income_total = records.filter(record_type='INGRESO').aggregate(total=Sum('amount'))['total'] or 0
+    expense_total = records.filter(record_type='EGRESO').aggregate(total=Sum('amount'))['total'] or 0
+    extra_blue_total = records.filter(classification='AZUL').aggregate(total=Sum('amount'))['total'] or 0
+    debt_red_total = records.filter(classification='ROJO').aggregate(total=Sum('amount'))['total'] or 0
+    regular_black_total = records.filter(classification='NEGRO').aggregate(total=Sum('amount'))['total'] or 0
+    transfer_surcharge_for_runners = records.filter(reason='RECARGO_TRANSFERENCIA').aggregate(total=Sum('runners_commission'))['total'] or 0
+
+    return Response({
+        'period_days': days,
+        'total_records': records.count(),
+        'income_total': float(income_total),
+        'expense_total': float(expense_total),
+        'net_total': float(income_total - expense_total),
+        'red_total': float(debt_red_total),
+        'blue_total': float(extra_blue_total),
+        'black_total': float(regular_black_total),
+        'transfer_surcharge_for_runners': float(transfer_surcharge_for_runners),
+        'by_classification': list(by_classification),
+        'by_reason': list(by_reason),
+    })
 
 
 @api_view(['GET'])
@@ -122,4 +179,19 @@ def services_report(request):
         'by_category': list(by_category),
         'total_revenue': float(requests.aggregate(Sum('client_total'))['client_total__sum'] or 0),
         'total_provider_fees': float(requests.aggregate(Sum('provider_fee'))['provider_fee__sum'] or 0),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdmin])
+def contacts_report(request):
+    """Reporte de contactos por tipo y actividad."""
+    contacts = Contact.objects.all()
+    by_type = contacts.values('contact_type').annotate(total=Count('id')).order_by('-total')
+
+    return Response({
+        'total_contacts': contacts.count(),
+        'active_contacts': contacts.filter(is_active=True).count(),
+        'inactive_contacts': contacts.filter(is_active=False).count(),
+        'by_type': list(by_type),
     })

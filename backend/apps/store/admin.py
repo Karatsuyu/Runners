@@ -11,8 +11,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Commerce)
 class CommerceAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'phone', 'is_active', 'created_at']
-    list_filter = ['category', 'is_active']
+    list_display = ['name', 'category', 'business_type', 'phone', 'menu_pdf', 'is_active', 'created_at']
+    list_filter = ['category', 'business_type', 'is_active']
     search_fields = ['name', 'description']
 
 
