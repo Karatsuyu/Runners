@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/theme/theme_mode_provider.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 
 class _NavTab {
@@ -13,12 +14,12 @@ class _NavTab {
 }
 
 // ── Shell del Cliente ──────────────────────────────────────────────────────
-class ClientShell extends StatelessWidget {
+class ClientShell extends ConsumerWidget {
   final Widget child;
   const ClientShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
     final tabs = [
       _NavTab(AppRoutes.deliveries, Icons.delivery_dining_rounded, 'Domicilios'),
@@ -31,6 +32,29 @@ class ClientShell extends StatelessWidget {
 
     return Scaffold(
       body: child,
+      floatingActionButton: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [BoxShadow(blurRadius: 6, color: Colors.black12)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              ref.watch(themeModeProvider) == ThemeMode.dark
+                  ? Icons.nightlight_round
+                  : Icons.wb_sunny,
+              size: 18,
+            ),
+            Switch(
+              value: ref.watch(themeModeProvider) == ThemeMode.dark,
+              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (i) => context.go(tabs[i].route),

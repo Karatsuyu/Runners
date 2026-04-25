@@ -512,38 +512,6 @@
 
 ---
 
-### RF-CON-003 — Creación de Contacto o Servicio por el Usuario
-
-| | | |
-|---|---|---|
-| **Código** | CON-RF-003 | |
-| **Nombre** | Solicitud de creación de contacto o servicio local | |
-| **Descripción** | Permite al usuario presionar una cuadrícula con un botón '+' central para abrir un formulario y agregar su propio número al directorio como "Contacto" (público) o "Servicio" (privado). La publicación está sujeta a la aprobación del administrador y se restringe a un solo registro por usuario. | |
-| **Actores** | Cliente, Sistema, Administrador | |
-| | | |
-| **Precondición** | El usuario debe estar autenticado con su email en la plataforma. | |
-| | El usuario no debe tener un contacto previo ya registrado (se valida unicidad 1 a 1). | |
-| | | |
-| | **Paso** | **Descripción** |
-| **Secuencia normal** | 1 | El usuario navega al directorio y visualiza la cuadrícula con el círculo central y el símbolo `+`. |
-| | 2 | Al presionar, se abre un modal de "Agregar Contacto" con campos: teléfono, nombre completo, descripción y un menú cascada (Contacto / Servicio). |
-| | 3 | El usuario llena los datos y presiona el botón "Crear contacto". |
-| | 4 | El sistema valida que el usuario no tenga otro contacto ya creado. |
-| | 5 | Se guarda en base de datos con estado `PENDIENTE`. |
-| | 6 | El administrador recibe la solicitud en su panel y la aprueba. |
-| | 7 | El registro se publica y aparece en el directorio de todos los usuarios. |
-| | | |
-| **Secuencia alterna** | 7A | Si el usuario seleccionó "Servicio", el registro se publica pero el **número telefónico es Privado**. Solo puede ser visto por el creador y el administrador. |
-| | 7B | Si se seleccionó "Contacto", el número es **Público** y visible. |
-| | | |
-| **Excepciones** | E1 | El usuario ya tiene un contacto: el sistema devuelve aviso local ("Ya tienes un registro creado"). |
-| | | |
-| **Postcondición** | La solicitud queda registrada en estado PENDIENTE. | |
-| | | |
-| **Comentarios** | El backend en Django maneja automáticamente la regla de enmascarar u ocultar el campo `phone` según el rol de quien consulta la API. | |
-
----
-
 ### RF-ADM-001 — Panel de Administración General
 
 | | | |
@@ -823,32 +791,6 @@ python manage.py runserver
 # Servidor disponible en: http://localhost:8000
 ```
 
-
-### 4.4 Configuración del Frontend (Flutter + Dart)
-
-```bash
-# Ingresar a la carpeta del frontend
-cd frontend
-
-# Descargar las dependencias y paquetes de Dart
-flutter pub get
-
-# Copiar el archivo de variables de entorno
-cp .env.example .env
-# --- EJECUCIÓN ---
-
-# Ejecutar la aplicación (Flutter detectará automáticamente tu emulador abierto o Chrome)
-flutter run
-
-# Si tienes múltiples dispositivos conectados o quieres forzar un emulador web específico:
-# flutter run -d chrome
-# flutter run -d edge
-
-# --- CONSTRUCCIÓN PARA PRODUCCIÓN (WEB) ---
-
-# Cuando vayas a generar tus archivos finales para desplegar la app web:
-flutter build web --release
-# Los archivos compilados quedarán en: frontend/build/web/
 
 
 

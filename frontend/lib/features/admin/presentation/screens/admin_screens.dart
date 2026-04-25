@@ -83,6 +83,34 @@ class AdminUserModel {
   }
 }
 
+class AdminDeliveryRequestModel {
+  final int id;
+  final String clientName;
+  final String description;
+  final String pickupAddress;
+  final String deliveryAddress;
+  final String approvalStatus;
+
+  const AdminDeliveryRequestModel({
+    required this.id,
+    required this.clientName,
+    required this.description,
+    required this.pickupAddress,
+    required this.deliveryAddress,
+    required this.approvalStatus,
+  });
+
+  factory AdminDeliveryRequestModel.fromJson(Map<String, dynamic> j) =>
+      AdminDeliveryRequestModel(
+        id: j['id'] as int,
+        clientName: j['client_name'] as String? ?? '',
+        description: j['description'] as String? ?? '',
+        pickupAddress: j['pickup_address'] as String? ?? '',
+        deliveryAddress: j['delivery_address'] as String? ?? '',
+        approvalStatus: j['approval_status'] as String? ?? 'PENDIENTE',
+      );
+}
+
 final adminDashboardProvider = FutureProvider<AdminDashboardData>((ref) async {
   final dio = ref.watch(dioClientProvider).dio;
   final res = await dio.get(ApiConstants.dashboardReport);
@@ -98,6 +126,17 @@ final adminUsersProvider = FutureProvider<List<AdminUserModel>>((ref) async {
   return data.map((j) => AdminUserModel.fromJson(j as Map<String, dynamic>)).toList();
 });
 
+final adminPendingDeliveriesProvider =
+    FutureProvider<List<AdminDeliveryRequestModel>>((ref) async {
+  final dio = ref.watch(dioClientProvider).dio;
+  final res = await dio.get(ApiConstants.deliveryRequests);
+  final data = res.data is List ? res.data as List : (res.data['results'] as List? ?? []);
+  return data
+      .map((j) => AdminDeliveryRequestModel.fromJson(j as Map<String, dynamic>))
+      .where((d) => d.approvalStatus == 'PENDIENTE')
+      .toList();
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AdminDashboardScreen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -105,9 +144,45 @@ final adminUsersProvider = FutureProvider<List<AdminUserModel>>((ref) async {
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
+  Future<void> _approveDelivery(
+    BuildContext context,
+    WidgetRef ref,
+    AdminDeliveryRequestModel request,
+  ) async {
+    final feeCtrl = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Autorizar domicilio'),
+        content: TextField(
+          controller: feeCtrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Valor domicilio',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Autorizar')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final fee = double.tryParse(feeCtrl.text.trim());
+    if (fee == null || fee <= 0) return;
+    final dio = ref.read(dioClientProvider).dio;
+    await dio.patch(
+      ApiConstants.approveDelivery(request.id),
+      data: {'admin_delivery_fee': fee, 'approved': true},
+    );
+    ref.invalidate(adminPendingDeliveriesProvider);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashAsync = ref.watch(adminDashboardProvider);
+    final deliveriesAsync = ref.watch(adminPendingDeliveriesProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -220,6 +295,45 @@ class AdminDashboardScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Domicilios pendientes',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              deliveriesAsync.when(
+                loading: () => const AppLoading(),
+                error: (e, _) => AppErrorWidget(
+                  message: 'Error cargando domicilios',
+                  onRetry: () => ref.invalidate(adminPendingDeliveriesProvider),
+                ),
+                data: (items) {
+                  if (items.isEmpty) {
+                    return const Text('No hay domicilios pendientes');
+                  }
+                  return ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (_, i) {
+                      final item = items[i];
+                      return Card(
+                        child: ListTile(
+                          title: Text(item.clientName),
+                          subtitle: Text(item.description),
+                          trailing: TextButton(
+                            onPressed: () => _approveDelivery(context, ref, item),
+                            child: const Text('Autorizar'),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),

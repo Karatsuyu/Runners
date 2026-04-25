@@ -1,8 +1,15 @@
+from decimal import Decimal
 from rest_framework import generics, status, permissions, serializers
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.utils import timezone
-from .models import Deliverer, DeliveryRequest, FinancialRecord, SystemConfig
+from .models import (
+    Deliverer,
+    DeliveryRequest,
+    FinancialRecord,
+    SystemConfig,
+    DeliveryChatMessage,
+)
 from apps.users.permissions import IsAdmin, IsDomiciliario
 from apps.users.models import User
 
@@ -24,7 +31,7 @@ class DelivererSerializer(serializers.ModelSerializer):
 class FinancialRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = FinancialRecord
-        fields = ['id', 'record_type', 'amount', 'description', 'runners_commission', 'created_at']
+        fields = ['id', 'record_type', 'amount', 'description', 'runners_commission', 'created_at', 'related_delivery']
         read_only_fields = ['id', 'runners_commission', 'created_at']
 
 
@@ -33,16 +40,23 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
     deliverer_name = serializers.SerializerMethodField()
     deliverer_number = serializers.SerializerMethodField()
 
+    approval_status = serializers.CharField(read_only=True)
+    is_delivered = serializers.BooleanField(read_only=True)
+    is_paid = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = DeliveryRequest
         fields = [
             'id', 'client', 'client_name', 'deliverer', 'deliverer_name', 'deliverer_number',
             'description', 'pickup_address', 'delivery_address',
-            'status', 'delivery_fee', 'completed_at', 'created_at', 'updated_at',
+            'status', 'approval_status', 'delivery_fee', 'admin_delivery_fee',
+            'is_delivered', 'is_paid', 'order', 'approved_at',
+            'completed_at', 'created_at', 'updated_at',
         ]
         read_only_fields = [
             'id', 'client', 'deliverer', 'status', 'delivery_fee',
-            'completed_at', 'created_at', 'updated_at',
+            'admin_delivery_fee', 'approval_status', 'approved_at',
+            'is_delivered', 'is_paid', 'completed_at', 'created_at', 'updated_at',
         ]
 
     def get_deliverer_name(self, obj):
@@ -53,9 +67,35 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
 
 class DeliveryRequestCreateSerializer(serializers.ModelSerializer):
+    order_id = serializers.IntegerField(required=False, allow_null=True)
+
     class Meta:
         model = DeliveryRequest
-        fields = ['description', 'pickup_address', 'delivery_address']
+        fields = ['description', 'pickup_address', 'delivery_address', 'order_id']
+
+
+class DeliveryApprovalSerializer(serializers.Serializer):
+    admin_delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    approved = serializers.BooleanField(default=True)
+
+
+class DeliveryStatusToggleSerializer(serializers.Serializer):
+    is_delivered = serializers.BooleanField(required=False)
+    is_paid = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if 'is_delivered' not in attrs and 'is_paid' not in attrs:
+            raise serializers.ValidationError('Debes enviar is_delivered o is_paid.')
+        return attrs
+
+
+class DeliveryChatMessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.CharField(source='sender.get_full_name', read_only=True)
+
+    class Meta:
+        model = DeliveryChatMessage
+        fields = ['id', 'delivery_request', 'sender', 'sender_name', 'recipient_role', 'message', 'created_at']
+        read_only_fields = ['id', 'delivery_request', 'sender', 'sender_name', 'created_at']
 
 
 class DelivererListView(generics.ListAPIView):
@@ -144,31 +184,127 @@ class DeliveryRequestListCreateView(generics.ListCreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        available = Deliverer.objects.filter(
-            is_active=True,
-            status=Deliverer.Status.DISPONIBLE,
-        ).order_by('assigned_number')
+        order = None
+        order_id = serializer.validated_data.pop('order_id', None)
+        if order_id:
+            from apps.store.models import Order
+            try:
+                order = Order.objects.get(pk=order_id, client=request.user)
+            except Order.DoesNotExist:
+                return Response({'error': 'Pedido no encontrado para este usuario.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not available.exists():
-            return Response(
-                {'error': 'No hay domiciliarios disponibles en este momento. Intenta más tarde.'},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
-        deliverer = available.first()
         delivery_request = serializer.save(
             client=request.user,
-            deliverer=deliverer,
-            status=DeliveryRequest.Status.ACEPTADO,
+            order=order,
+            status=DeliveryRequest.Status.SOLICITADO,
+            approval_status=DeliveryRequest.ApprovalStatus.PENDIENTE,
         )
-
-        deliverer.status = Deliverer.Status.OCUPADO
-        deliverer.save(update_fields=['status'])
 
         return Response(
             DeliveryRequestSerializer(delivery_request).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class DeliveryRequestApproveView(generics.UpdateAPIView):
+    permission_classes = [IsAdmin]
+    serializer_class = DeliveryApprovalSerializer
+    queryset = DeliveryRequest.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        delivery = self.get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        available = Deliverer.objects.filter(
+            is_active=True,
+            status=Deliverer.Status.DISPONIBLE,
+        ).order_by('assigned_number')
+        if not available.exists():
+            return Response({'error': 'No hay domiciliarios disponibles.'}, status=status.HTTP_409_CONFLICT)
+
+        approved = serializer.validated_data['approved']
+        fee = serializer.validated_data['admin_delivery_fee']
+        if approved:
+            delivery.approval_status = DeliveryRequest.ApprovalStatus.AUTORIZADO
+            delivery.status = DeliveryRequest.Status.ACEPTADO
+            delivery.deliverer = available.first()
+            delivery.deliverer.status = Deliverer.Status.OCUPADO
+            delivery.deliverer.save(update_fields=['status'])
+        else:
+            delivery.approval_status = DeliveryRequest.ApprovalStatus.RECHAZADO
+            delivery.status = DeliveryRequest.Status.CANCELADO
+
+        delivery.admin_delivery_fee = fee
+        delivery.delivery_fee = fee
+        delivery.approved_by = request.user
+        delivery.approved_at = timezone.now()
+        delivery.save()
+
+        if approved and delivery.order:
+            delivery.order.delivery_total = fee
+            delivery.order.total = (delivery.order.products_subtotal or Decimal('0')) + fee
+            delivery.order.save(update_fields=['delivery_total', 'total', 'updated_at'])
+
+        return Response(DeliveryRequestSerializer(delivery).data)
+
+
+class DeliveryChatListCreateView(generics.ListCreateAPIView):
+    serializer_class = DeliveryChatMessageSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _can_access_delivery(self, delivery):
+        user = self.request.user
+        if user.role == User.Role.ADMIN:
+            return True
+        if delivery.client_id == user.id:
+            return True
+        return delivery.deliverer and delivery.deliverer.user_id == user.id
+
+    def get_delivery(self):
+        delivery = DeliveryRequest.objects.filter(pk=self.kwargs['pk']).first()
+        if not delivery:
+            raise serializers.ValidationError('Solicitud no encontrada.')
+        if not self._can_access_delivery(delivery):
+            raise serializers.ValidationError('Sin permiso para este chat.')
+        return delivery
+
+    def get_queryset(self):
+        delivery = self.get_delivery()
+        return delivery.chat_messages.select_related('sender').all()
+
+    def perform_create(self, serializer):
+        delivery = self.get_delivery()
+        sender_role = self.request.user.role
+        recipient_role = serializer.validated_data['recipient_role']
+        allowed_pairs = {
+            (User.Role.CLIENTE, User.Role.ADMIN),
+            (User.Role.ADMIN, User.Role.CLIENTE),
+            (User.Role.ADMIN, User.Role.DOMICILIARIO),
+            (User.Role.DOMICILIARIO, User.Role.ADMIN),
+        }
+        if (sender_role, recipient_role) not in allowed_pairs:
+            raise serializers.ValidationError('Combinación de roles no permitida para chat.')
+        serializer.save(delivery_request=delivery, sender=self.request.user)
+
+
+@api_view(['GET'])
+@permission_classes([IsDomiciliario])
+def my_deliverer_profile(request):
+    try:
+        deliverer = Deliverer.objects.get(user=request.user)
+    except Deliverer.DoesNotExist:
+        return Response({'error': 'Perfil no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    completed_count = DeliveryRequest.objects.filter(
+        deliverer=deliverer,
+        status=DeliveryRequest.Status.ENTREGADO
+    ).count()
+    payload = DelivererSerializer(deliverer).data
+    payload['full_name'] = request.user.get_full_name()
+    payload['total_earnings'] = float(deliverer.current_balance)
+    payload['completed_deliveries'] = completed_count
+    return Response(payload)
 
 
 @api_view(['POST'])
@@ -189,20 +325,31 @@ def complete_delivery(request, pk):
     if not (is_admin or is_assigned_deliverer):
         return Response({'error': 'Sin permiso para completar este domicilio.'}, status=status.HTTP_403_FORBIDDEN)
 
-    if delivery.status == DeliveryRequest.Status.ENTREGADO:
-        return Response({'error': 'Este domicilio ya fue completado.'}, status=status.HTTP_400_BAD_REQUEST)
+    serializer = DeliveryStatusToggleSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
 
-    if delivery.status == DeliveryRequest.Status.CANCELADO:
-        return Response({'error': 'Este domicilio fue cancelado.'}, status=status.HTTP_400_BAD_REQUEST)
+    if 'is_delivered' in data:
+        delivery.is_delivered = data['is_delivered']
+        if delivery.is_delivered:
+            delivery.status = DeliveryRequest.Status.ENTREGADO
+            delivery.completed_at = timezone.now()
+            if delivery.deliverer:
+                delivery.deliverer.status = Deliverer.Status.DISPONIBLE
+                delivery.deliverer.save(update_fields=['status'])
+        else:
+            delivery.status = DeliveryRequest.Status.EN_CAMINO
+            delivery.completed_at = None
+            delivery.is_paid = False
+            delivery.paid_at = None
 
-    delivery.status = DeliveryRequest.Status.ENTREGADO
-    delivery.completed_at = timezone.now()
-    delivery.save(update_fields=['status', 'completed_at', 'updated_at'])
+    if 'is_paid' in data:
+        if not delivery.is_delivered:
+            return Response({'error': 'No puedes marcar pago sin entrega.'}, status=status.HTTP_400_BAD_REQUEST)
+        delivery.is_paid = data['is_paid']
+        delivery.paid_at = timezone.now() if delivery.is_paid else None
 
-    if delivery.deliverer:
-        delivery.deliverer.status = Deliverer.Status.DISPONIBLE
-        delivery.deliverer.save(update_fields=['status'])
-
+    delivery.save()
     return Response(DeliveryRequestSerializer(delivery).data)
 
 

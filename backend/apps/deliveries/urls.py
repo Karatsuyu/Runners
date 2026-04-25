@@ -4,8 +4,13 @@ from . import views
 urlpatterns = [
     path('deliverers/', views.DelivererListView.as_view(), name='deliverer_list'),
     path('deliverers/create/', views.DelivererCreateView.as_view(), name='deliverer_create'),
+    path('deliverers/me/', views.my_deliverer_profile, name='deliverer_profile_me'),
     path('deliverers/status/', views.DelivererStatusView.as_view(), name='deliverer_status'),
     path('requests/', views.DeliveryRequestListCreateView.as_view(), name='delivery_request_list_create'),
+    path('requests/create/', views.DeliveryRequestListCreateView.as_view(), name='delivery_request_create'),
+    path('requests/my-deliveries/', views.DeliveryRequestListCreateView.as_view(), name='my_deliveries'),
+    path('requests/<int:pk>/approve/', views.DeliveryRequestApproveView.as_view(), name='delivery_request_approve'),
+    path('requests/<int:pk>/chat/', views.DeliveryChatListCreateView.as_view(), name='delivery_request_chat'),
     path('requests/<int:pk>/complete/', views.complete_delivery, name='delivery_request_complete'),
     path('requests/<int:pk>/cancel/', views.cancel_delivery, name='delivery_request_cancel'),
     path('deliverers/<int:deliverer_pk>/records/', views.FinancialRecordListCreateView.as_view(), name='financial_records'),

@@ -72,6 +72,8 @@ def sales_report(request):
     return Response({
         'period_days': days,
         'total_orders': orders.count(),
+        'total_products_revenue': orders.aggregate(Sum('products_subtotal'))['products_subtotal__sum'] or 0,
+        'total_delivery_revenue': orders.aggregate(Sum('delivery_total'))['delivery_total__sum'] or 0,
         'total_revenue': orders.aggregate(Sum('total'))['total__sum'] or 0,
         'by_commerce': list(report)
     })
