@@ -13,9 +13,4 @@ urlpatterns = [
 
     # Perfil
     path('profile/', views.UserProfileView.as_view(), name='user_profile'),
-
-    # Admin
-    path('users/', views.UserListView.as_view(), name='user_list'),
-    path('users/<int:pk>/', views.UserDetailAdminView.as_view(), name='user_detail'),
-    path('users/<int:pk>/toggle-status/', views.toggle_user_status, name='user_toggle_status'),
 ]

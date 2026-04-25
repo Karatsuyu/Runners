@@ -27,7 +27,7 @@ class AppRoutes {
 
   // Shell de admin
   static const String adminDashboard = '/admin/dashboard';
-  static const String manageUsers = '/admin/users';
+  static const String manageUsers = '/admin/domiciliarios';
   static const String manageProviders = '/admin/providers';
   static const String manageStore = '/admin/store';
   static const String manageContacts = '/admin/contacts';

@@ -150,7 +150,7 @@ class AdminShell extends ConsumerWidget {
             _DrawerItem(
                 Icons.dashboard_rounded, 'Dashboard', AppRoutes.adminDashboard),
             _DrawerItem(
-                Icons.people_rounded, 'Usuarios', AppRoutes.manageUsers),
+              Icons.delivery_dining_rounded, 'Domiciliarios', AppRoutes.manageUsers),
             _DrawerItem(
                 Icons.handyman_rounded, 'Prestadores', AppRoutes.manageProviders),
             _DrawerItem(
@@ -175,9 +175,10 @@ class _DrawerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleLabel = label == 'Usuarios' ? 'Domiciliarios' : label;
     return ListTile(
       leading: Icon(icon, color: AppColors.primaryGreen),
-      title: Text(label),
+      title: Text(visibleLabel),
       onTap: () {
         Navigator.pop(context);
         context.go(route);

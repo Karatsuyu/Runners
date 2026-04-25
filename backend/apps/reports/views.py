@@ -26,32 +26,62 @@ def dashboard_summary(request):
     """Resumen general para el dashboard del administrador."""
     from apps.users.models import User
 
+    total_users = User.objects.filter(is_active=True).count()
+    clients = User.objects.filter(role='CLIENTE', is_active=True).count()
+    providers = User.objects.filter(role='PRESTADOR', is_active=True).count()
+    deliverers = User.objects.filter(role='DOMICILIARIO', is_active=True).count()
+
+    total_orders = Order.objects.count()
+    pending_orders = Order.objects.filter(status='PENDIENTE').count()
+    delivered_orders = Order.objects.filter(status='ENTREGADO').count()
+    total_revenue = float(Order.objects.aggregate(total=Sum('total'))['total'] or 0)
+
+    total_deliveries = DeliveryRequest.objects.count()
+    active_deliveries = DeliveryRequest.objects.filter(status='ACEPTADO').count()
+    completed_deliveries = DeliveryRequest.objects.filter(status='ENTREGADO').count()
+    cancelled_deliveries = DeliveryRequest.objects.filter(status='CANCELADO').count()
+    deliverers_available = Deliverer.objects.filter(status='DISPONIBLE', is_active=True).count()
+    deliverers_busy = Deliverer.objects.filter(status='OCUPADO', is_active=True).count()
+
+    total_services = ServiceRequest.objects.count()
+    registered_services = ServiceRequest.objects.filter(status='REGISTRADA').count()
+    in_process_services = ServiceRequest.objects.filter(status='EN_PROCESO').count()
+    completed_services = ServiceRequest.objects.filter(status='COMPLETADA').count()
+    providers_pending_approval = ServiceProvider.objects.filter(approval_status='PENDIENTE').count()
+
     return Response({
+        # Flat keys used by mobile dashboard cards.
+        'total_users': total_users,
+        'pending_providers': providers_pending_approval,
+        'total_orders': total_orders,
+        'active_deliveries': active_deliveries,
+        'total_revenue': total_revenue,
+
         'users': {
-            'total': User.objects.filter(is_active=True).count(),
-            'clients': User.objects.filter(role='CLIENTE', is_active=True).count(),
-            'providers': User.objects.filter(role='PRESTADOR', is_active=True).count(),
-            'deliverers': User.objects.filter(role='DOMICILIARIO', is_active=True).count(),
+            'total': total_users,
+            'clients': clients,
+            'providers': providers,
+            'deliverers': deliverers,
         },
         'orders': {
-            'total': Order.objects.count(),
-            'pending': Order.objects.filter(status='PENDIENTE').count(),
-            'delivered': Order.objects.filter(status='ENTREGADO').count(),
+            'total': total_orders,
+            'pending': pending_orders,
+            'delivered': delivered_orders,
         },
         'deliveries': {
-            'total': DeliveryRequest.objects.count(),
-            'active': DeliveryRequest.objects.filter(status='ACEPTADO').count(),
-            'completed': DeliveryRequest.objects.filter(status='ENTREGADO').count(),
-            'cancelled': DeliveryRequest.objects.filter(status='CANCELADO').count(),
-            'deliverers_available': Deliverer.objects.filter(status='DISPONIBLE', is_active=True).count(),
-            'deliverers_busy': Deliverer.objects.filter(status='OCUPADO', is_active=True).count(),
+            'total': total_deliveries,
+            'active': active_deliveries,
+            'completed': completed_deliveries,
+            'cancelled': cancelled_deliveries,
+            'deliverers_available': deliverers_available,
+            'deliverers_busy': deliverers_busy,
         },
         'services': {
-            'total': ServiceRequest.objects.count(),
-            'registered': ServiceRequest.objects.filter(status='REGISTRADA').count(),
-            'in_process': ServiceRequest.objects.filter(status='EN_PROCESO').count(),
-            'completed': ServiceRequest.objects.filter(status='COMPLETADA').count(),
-            'providers_pending_approval': ServiceProvider.objects.filter(approval_status='PENDIENTE').count(),
+            'total': total_services,
+            'registered': registered_services,
+            'in_process': in_process_services,
+            'completed': completed_services,
+            'providers_pending_approval': providers_pending_approval,
         },
     })
 

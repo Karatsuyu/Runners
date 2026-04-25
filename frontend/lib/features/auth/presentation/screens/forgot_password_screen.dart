@@ -85,7 +85,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Contrasena actualizada. Ya puedes iniciar sesion.'),
+        content: Text('Contraseña actualizada. Ya puedes iniciar sesion.'),
       ),
     );
     context.go(AppRoutes.login);
@@ -106,7 +106,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             errorBuilder: (_, __, ___) => const Icon(Icons.arrow_back),
           ),
         ),
-        title: const Text('Recuperar contrasena'),
+        title: const Text('Recuperar contraseña'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
       ),
@@ -180,7 +180,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 12),
                     AppTextField(
                       controller: _newPassCtrl,
-                      label: 'Nueva contrasena',
+                      label: 'Nueva contraseña',
                       prefixIcon: Icons.lock_outline,
                       obscureText: _hideNewPassword,
                       suffixIcon: IconButton(
@@ -200,7 +200,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                     const SizedBox(height: 12),
                     AppTextField(
                       controller: _newPass2Ctrl,
-                      label: 'Confirmar nueva contrasena',
+                      label: 'Confirmar nueva contraseña',
                       prefixIcon: Icons.lock_reset,
                       obscureText: _hideNewPassword2,
                       suffixIcon: IconButton(
@@ -220,7 +220,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                           return 'Minimo 6 caracteres';
                         }
                         if (v != _newPassCtrl.text) {
-                          return 'Las contrasenas no coinciden';
+                          return 'Las contraseñas no coinciden';
                         }
                         return null;
                       },
@@ -244,7 +244,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Actualizar contrasena'),
+                            : const Text('Actualizar contraseña'),
                       ),
                     ),
                   ],

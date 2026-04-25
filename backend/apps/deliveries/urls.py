@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('deliverers/', views.DelivererListView.as_view(), name='deliverer_list'),
     path('deliverers/create/', views.DelivererCreateView.as_view(), name='deliverer_create'),
+    path('deliverers/<int:pk>/toggle-status/', views.toggle_deliverer_status, name='deliverer_toggle_status'),
     path('deliverers/status/', views.DelivererStatusView.as_view(), name='deliverer_status'),
     path('requests/', views.DeliveryRequestListCreateView.as_view(), name='delivery_request_list_create'),
     path('requests/<int:pk>/complete/', views.complete_delivery, name='delivery_request_complete'),

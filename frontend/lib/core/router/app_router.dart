@@ -59,6 +59,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (isGuest && !isPublic && !isClientRoute) return AppRoutes.login;
       if (isGuest && isGuestBlockedRoute) return AppRoutes.login;
 
+      // Privacy hard-stop: disable admin users management route.
+      if (location.startsWith('/admin/users')) return AppRoutes.adminDashboard;
+
       if (isAuth && isPublic && location != AppRoutes.splash) {
         return _homeForRole(authState.user?.role);
       }

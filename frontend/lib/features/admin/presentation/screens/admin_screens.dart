@@ -31,14 +31,28 @@ class AdminDashboardData {
     required this.totalRevenue,
   });
 
-  factory AdminDashboardData.fromJson(Map<String, dynamic> j) =>
-      AdminDashboardData(
-        totalUsers: j['total_users'] as int? ?? 0,
-        pendingProviders: j['pending_providers'] as int? ?? 0,
-        totalOrders: j['total_orders'] as int? ?? 0,
-        activeDeliveries: j['active_deliveries'] as int? ?? 0,
-        totalRevenue: (j['total_revenue'] as num?)?.toDouble() ?? 0.0,
-      );
+  factory AdminDashboardData.fromJson(Map<String, dynamic> j) {
+    final users = (j['users'] as Map<String, dynamic>?) ?? const {};
+    final services = (j['services'] as Map<String, dynamic>?) ?? const {};
+    final orders = (j['orders'] as Map<String, dynamic>?) ?? const {};
+    final deliveries = (j['deliveries'] as Map<String, dynamic>?) ?? const {};
+
+    return AdminDashboardData(
+      totalUsers: (j['total_users'] as num?)?.toInt() ??
+          (users['total'] as num?)?.toInt() ??
+          0,
+      pendingProviders: (j['pending_providers'] as num?)?.toInt() ??
+          (services['providers_pending_approval'] as num?)?.toInt() ??
+          0,
+      totalOrders: (j['total_orders'] as num?)?.toInt() ??
+          (orders['total'] as num?)?.toInt() ??
+          0,
+      activeDeliveries: (j['active_deliveries'] as num?)?.toInt() ??
+          (deliveries['active'] as num?)?.toInt() ??
+          0,
+      totalRevenue: (j['total_revenue'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
 }
 
 class AdminUserModel {
@@ -60,10 +74,10 @@ class AdminUserModel {
 
   factory AdminUserModel.fromJson(Map<String, dynamic> j) => AdminUserModel(
         id: j['id'] as int,
-        fullName: j['full_name'] as String? ?? '',
-        email: j['email'] as String? ?? '',
+      fullName: j['user_name'] as String? ?? j['full_name'] as String? ?? '',
+      email: j['user_email'] as String? ?? j['email'] as String? ?? '',
         phone: j['phone'] as String? ?? '',
-        role: j['role'] as String? ?? '',
+      role: j['role'] as String? ?? 'DOMICILIARIO',
         isActive: j['is_active'] as bool? ?? true,
       );
 
@@ -91,7 +105,7 @@ final adminDashboardProvider = FutureProvider<AdminDashboardData>((ref) async {
 
 final adminUsersProvider = FutureProvider<List<AdminUserModel>>((ref) async {
   final dio = ref.watch(dioClientProvider).dio;
-  final res = await dio.get(ApiConstants.users);
+  final res = await dio.get(ApiConstants.deliverers);
   final data = res.data is List
       ? res.data as List
       : (res.data['results'] as List? ?? []);
@@ -189,7 +203,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   childAspectRatio: 1.4,
                   children: [
                     _DashCard(
-                      title: 'Usuarios',
+                      title: 'Domiciliarios',
                       value: '${data.totalUsers}',
                       icon: Icons.people_outline,
                       color: AppColors.primaryGreen,
@@ -313,12 +327,12 @@ class ManageUsersScreen extends ConsumerWidget {
 
     try {
       final dio = ref.read(dioClientProvider).dio;
-      await dio.post(ApiConstants.toggleUserStatus(user.id));
+      await dio.post(ApiConstants.toggleDelivererStatus(user.id));
       ref.invalidate(adminUsersProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Usuario ${user.isActive ? 'suspendido' : 'activado'}'),
+            content: Text('Domiciliario ${user.isActive ? 'desactivado' : 'activado'}'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -339,7 +353,7 @@ class ManageUsersScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Gestionar Usuarios'),
+        title: const Text('Gestionar Domiciliarios'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -353,15 +367,15 @@ class ManageUsersScreen extends ConsumerWidget {
       body: usersAsync.when(
         loading: () => const AppLoading(),
         error: (e, _) => AppErrorWidget(
-          message: 'Error cargando usuarios',
+          message: 'Error cargando domiciliarios',
           onRetry: () => ref.invalidate(adminUsersProvider),
         ),
         data: (users) {
           if (users.isEmpty) {
             return const AppEmptyState(
               icon: Icons.people_outline,
-              title: 'Sin usuarios',
-              subtitle: 'No hay usuarios registrados',
+              title: 'Sin domiciliarios',
+              subtitle: 'No hay domiciliarios registrados',
             );
           }
           return RefreshIndicator(
@@ -410,7 +424,8 @@ class _UserTile extends StatelessWidget {
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(user.email, style: const TextStyle(fontSize: 12)),
+            if (user.email.isNotEmpty)
+              Text(user.email, style: const TextStyle(fontSize: 12)),
             Text(user.roleLabel,
                 style: const TextStyle(fontSize: 12, color: AppColors.primaryGreen)),
           ],
@@ -436,7 +451,10 @@ class ManageProvidersScreen extends ConsumerWidget {
   Future<void> _approve(BuildContext context, WidgetRef ref, int providerId) async {
     try {
       final dio = ref.read(dioClientProvider).dio;
-      await dio.post(ApiConstants.approveProvider(providerId), data: {'approved': true});
+      await dio.post(
+        ApiConstants.approveProvider(providerId),
+        data: {'action': 'approve'},
+      );
       ref.invalidate(providersProvider);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -492,7 +510,7 @@ class ManageProvidersScreen extends ConsumerWidget {
       final dio = ref.read(dioClientProvider).dio;
       await dio.post(
         ApiConstants.approveProvider(providerId),
-        data: {'approved': false, 'reason': reasonCtrl.text},
+        data: {'action': 'reject', 'reason': reasonCtrl.text},
       );
       ref.invalidate(providersProvider);
       if (context.mounted) {

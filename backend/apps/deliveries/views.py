@@ -12,12 +12,13 @@ from apps.users.models import User
 
 class DelivererSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_email = serializers.EmailField(source='user.email', read_only=True)
     phone = serializers.CharField(source='user.phone', read_only=True)
     balance = serializers.DecimalField(source='current_balance', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Deliverer
-        fields = ['id', 'user', 'user_name', 'phone', 'assigned_number', 'status', 'work_type', 'is_active', 'balance']
+        fields = ['id', 'user', 'user_name', 'user_email', 'phone', 'assigned_number', 'status', 'work_type', 'is_active', 'balance']
         read_only_fields = ['id', 'user']
 
 
@@ -30,13 +31,18 @@ class FinancialRecordSerializer(serializers.ModelSerializer):
 
 class DeliveryRequestSerializer(serializers.ModelSerializer):
     client_name = serializers.CharField(source='client.get_full_name', read_only=True)
+    client_email = serializers.EmailField(source='client.email', read_only=True)
+    client_phone = serializers.CharField(source='client.phone', read_only=True)
     deliverer_name = serializers.SerializerMethodField()
     deliverer_number = serializers.SerializerMethodField()
+    deliverer_email = serializers.SerializerMethodField()
+    deliverer_phone = serializers.SerializerMethodField()
 
     class Meta:
         model = DeliveryRequest
         fields = [
-            'id', 'client', 'client_name', 'deliverer', 'deliverer_name', 'deliverer_number',
+            'id', 'client', 'client_name', 'client_email', 'client_phone',
+            'deliverer', 'deliverer_name', 'deliverer_number', 'deliverer_email', 'deliverer_phone',
             'description', 'pickup_address', 'delivery_address',
             'status', 'delivery_fee', 'completed_at', 'created_at', 'updated_at',
         ]
@@ -50,6 +56,12 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
     def get_deliverer_number(self, obj):
         return obj.deliverer.assigned_number if obj.deliverer else None
+
+    def get_deliverer_email(self, obj):
+        return obj.deliverer.user.email if obj.deliverer else None
+
+    def get_deliverer_phone(self, obj):
+        return obj.deliverer.user.phone if obj.deliverer else None
 
 
 class DeliveryRequestCreateSerializer(serializers.ModelSerializer):
@@ -65,7 +77,7 @@ class DelivererListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         if user.role == User.Role.ADMIN:
-            return Deliverer.objects.filter(is_active=True)
+            return Deliverer.objects.all().order_by('assigned_number')
         return Deliverer.objects.filter(is_active=True, status='DISPONIBLE')
 
 
@@ -75,6 +87,25 @@ class DelivererCreateView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save()
+
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def toggle_deliverer_status(request, pk):
+    try:
+        deliverer = Deliverer.objects.get(pk=pk)
+    except Deliverer.DoesNotExist:
+        return Response({'error': 'Domiciliario no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    deliverer.is_active = not deliverer.is_active
+    deliverer.save(update_fields=['is_active'])
+
+    if not deliverer.is_active and deliverer.status == Deliverer.Status.OCUPADO:
+        deliverer.status = Deliverer.Status.INACTIVO
+        deliverer.save(update_fields=['status'])
+
+    action = 'activado' if deliverer.is_active else 'desactivado'
+    return Response({'message': f'Domiciliario {action} exitosamente.', 'is_active': deliverer.is_active})
 
 
 class DelivererStatusView(generics.UpdateAPIView):

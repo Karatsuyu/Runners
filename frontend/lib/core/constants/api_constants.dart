@@ -27,6 +27,7 @@ class ApiConstants {
   static const String passwordResetConfirm = '/auth/password-reset/confirm/';
   static const String users = '/auth/users/';
   static String toggleUserStatus(int id) => '/auth/users/$id/toggle-status/';
+  static String toggleDelivererStatus(int id) => '/deliveries/deliverers/$id/toggle-status/';
 
   // Store
   static const String categories = '/store/categories/';

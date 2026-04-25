@@ -22,7 +22,17 @@ class ServiceProviderListView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = ServiceProvider.objects.filter(approval_status='APROBADO', status='DISPONIBLE')
+        user = self.request.user
+        if user.role == User.Role.ADMIN:
+            queryset = ServiceProvider.objects.all().order_by('-created_at')
+            approval_status = self.request.query_params.get('approval_status')
+            if approval_status:
+                queryset = queryset.filter(approval_status=approval_status)
+        else:
+            queryset = ServiceProvider.objects.filter(
+                approval_status='APROBADO',
+                status='DISPONIBLE',
+            )
         category = self.request.query_params.get('category')
         if category:
             queryset = queryset.filter(category_id=category)
