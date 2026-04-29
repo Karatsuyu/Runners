@@ -57,42 +57,68 @@ class AdminDashboardData {
 
 class AdminUserModel {
   final int id;
-  final String fullName;
+  final String firstName;
+  final String lastName;
+  final String username;
   final String email;
   final String phone;
-  final String role;
+  final int assignedNumber;
+  final String status;
+  final String workType;
   final bool isActive;
 
   const AdminUserModel({
     required this.id,
-    required this.fullName,
+    required this.firstName,
+    required this.lastName,
+    required this.username,
     required this.email,
     required this.phone,
-    required this.role,
+    required this.assignedNumber,
+    required this.status,
+    required this.workType,
     required this.isActive,
   });
 
   factory AdminUserModel.fromJson(Map<String, dynamic> j) => AdminUserModel(
-        id: j['id'] as int,
-      fullName: j['user_name'] as String? ?? j['full_name'] as String? ?? '',
-      email: j['user_email'] as String? ?? j['email'] as String? ?? '',
-        phone: j['phone'] as String? ?? '',
-      role: j['role'] as String? ?? 'DOMICILIARIO',
-        isActive: j['is_active'] as bool? ?? true,
-      );
+    id: j['id'] as int,
+    firstName: j['first_name'] as String? ?? '',
+    lastName: j['last_name'] as String? ?? '',
+    username: j['username'] as String? ?? '',
+    email: j['user_email'] as String? ?? j['email'] as String? ?? '',
+    phone: j['phone'] as String? ?? '',
+    assignedNumber: j['assigned_number'] as int? ?? 0,
+    status: j['status'] as String? ?? 'DISPONIBLE',
+    workType: j['work_type'] as String? ?? 'INDEPENDIENTE',
+    isActive: j['is_active'] as bool? ?? true,
+  );
 
-  String get roleLabel {
-    switch (role) {
-      case 'CLIENTE':
-        return 'Cliente';
-      case 'PRESTADOR':
-        return 'Prestador';
-      case 'DOMICILIARIO':
-        return 'Domiciliario';
-      case 'ADMIN':
-        return 'Admin';
+  String get fullName {
+    final combined = '$firstName $lastName'.trim();
+    return combined.isEmpty ? 'Sin nombre' : combined;
+  }
+
+  String get statusLabel {
+    switch (status) {
+      case 'DISPONIBLE':
+        return 'Disponible';
+      case 'OCUPADO':
+        return 'Ocupado';
+      case 'INACTIVO':
+        return 'Inactivo';
       default:
-        return role;
+        return status;
+    }
+  }
+
+  String get workTypeLabel {
+    switch (workType) {
+      case 'INDEPENDIENTE':
+        return 'Independiente';
+      case 'EMPRESA':
+        return 'Con la empresa';
+      default:
+        return workType;
     }
   }
 }
@@ -105,7 +131,7 @@ final adminDashboardProvider = FutureProvider<AdminDashboardData>((ref) async {
 
 final adminUsersProvider = FutureProvider<List<AdminUserModel>>((ref) async {
   final dio = ref.watch(dioClientProvider).dio;
-  final res = await dio.get(ApiConstants.deliverers);
+  final res = await dio.get(ApiConstants.manageDeliverers);
   final data = res.data is List
       ? res.data as List
       : (res.data['results'] as List? ?? []);
@@ -298,6 +324,55 @@ class _DashCard extends StatelessWidget {
 class ManageUsersScreen extends ConsumerWidget {
   const ManageUsersScreen({super.key});
 
+  Future<void> _saveDeliverer(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> payload,
+    {int? delivererId}
+  ) async {
+    final dio = ref.read(dioClientProvider).dio;
+    final isEditing = delivererId != null;
+    final response = isEditing
+        ? await dio.put('${ApiConstants.manageDeliverers}$delivererId/', data: payload)
+        : await dio.post(ApiConstants.manageDeliverers, data: payload);
+
+    ref.invalidate(adminUsersProvider);
+
+    if (!context.mounted) return;
+
+    final message = isEditing ? 'Domiciliario actualizado' : 'Domiciliario creado';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.success,
+      ),
+    );
+
+    final data = response.data;
+    if (!isEditing && data is Map<String, dynamic> && data['temporary_password'] != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Contraseña temporal: ${data['temporary_password']}'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openDelivererForm(
+    BuildContext context,
+    WidgetRef ref, {
+    AdminUserModel? initialData,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _DelivererFormDialog(initialData: initialData),
+    );
+    if (result != true || !context.mounted) return;
+
+    // El diálogo devuelve el payload en el Navigator.
+  }
+
   Future<void> _toggleStatus(
     BuildContext context,
     WidgetRef ref,
@@ -346,6 +421,53 @@ class ManageUsersScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _deleteDeliverer(
+    BuildContext context,
+    WidgetRef ref,
+    AdminUserModel user,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar domiciliario'),
+        content: Text('¿Seguro que quieres eliminar a ${user.fullName}? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final dio = ref.read(dioClientProvider).dio;
+      await dio.delete('${ApiConstants.manageDeliverers}${user.id}/');
+      ref.invalidate(adminUsersProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Domiciliario eliminado'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final usersAsync = ref.watch(adminUsersProvider);
@@ -358,6 +480,26 @@ class ManageUsersScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: 'Crear domiciliario',
+            onPressed: () async {
+              final payload = await showDialog<Map<String, dynamic>>(
+                context: context,
+                builder: (_) => const _DelivererFormDialog(),
+              );
+              if (payload == null || !context.mounted) return;
+              try {
+                await _saveDeliverer(context, ref, payload);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+                  );
+                }
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(adminUsersProvider),
@@ -375,7 +517,7 @@ class ManageUsersScreen extends ConsumerWidget {
             return const AppEmptyState(
               icon: Icons.people_outline,
               title: 'Sin domiciliarios',
-              subtitle: 'No hay domiciliarios registrados',
+              subtitle: 'Toca + para registrar el primero',
             );
           }
           return RefreshIndicator(
@@ -388,6 +530,23 @@ class ManageUsersScreen extends ConsumerWidget {
               itemBuilder: (context, i) => _UserTile(
                 user: users[i],
                 onToggle: () => _toggleStatus(context, ref, users[i]),
+                onEdit: () async {
+                  final payload = await showDialog<Map<String, dynamic>>(
+                    context: context,
+                    builder: (_) => _DelivererFormDialog(initialData: users[i]),
+                  );
+                  if (payload == null || !context.mounted) return;
+                  try {
+                    await _saveDeliverer(context, ref, payload, delivererId: users[i].id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+                      );
+                    }
+                  }
+                },
+                onDelete: () => _deleteDeliverer(context, ref, users[i]),
               ),
             ),
           );
@@ -400,8 +559,15 @@ class ManageUsersScreen extends ConsumerWidget {
 class _UserTile extends StatelessWidget {
   final AdminUserModel user;
   final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _UserTile({required this.user, required this.onToggle});
+  const _UserTile({
+    required this.user,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -426,17 +592,194 @@ class _UserTile extends StatelessWidget {
           children: [
             if (user.email.isNotEmpty)
               Text(user.email, style: const TextStyle(fontSize: 12)),
-            Text(user.roleLabel,
-                style: const TextStyle(fontSize: 12, color: AppColors.primaryGreen)),
+            Text(
+              'Nro: ${user.assignedNumber} · ${user.workTypeLabel} · ${user.statusLabel}',
+              style: const TextStyle(fontSize: 12, color: AppColors.primaryGreen),
+            ),
+            if (user.phone.isNotEmpty)
+              Text(user.phone, style: const TextStyle(fontSize: 12)),
           ],
         ),
-        trailing: Switch(
-          value: user.isActive,
-          activeThumbColor: AppColors.primaryGreen,
-          onChanged: (_) => onToggle(),
+        trailing: Wrap(
+          spacing: 0,
+          children: [
+            Switch(
+              value: user.isActive,
+              activeThumbColor: AppColors.primaryGreen,
+              onChanged: (_) => onToggle(),
+            ),
+            IconButton(
+              tooltip: 'Editar',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 20),
+            ),
+            IconButton(
+              tooltip: 'Eliminar',
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+            ),
+          ],
         ),
         isThreeLine: true,
       ),
+    );
+  }
+}
+
+class _DelivererFormDialog extends StatefulWidget {
+  final AdminUserModel? initialData;
+
+  const _DelivererFormDialog({this.initialData});
+
+  @override
+  State<_DelivererFormDialog> createState() => _DelivererFormDialogState();
+}
+
+class _DelivererFormDialogState extends State<_DelivererFormDialog> {
+  late final TextEditingController firstNameCtrl;
+  late final TextEditingController lastNameCtrl;
+  late final TextEditingController emailCtrl;
+  late final TextEditingController phoneCtrl;
+  late final TextEditingController usernameCtrl;
+  late final TextEditingController assignedNumberCtrl;
+  late final TextEditingController passwordCtrl;
+  String status = 'DISPONIBLE';
+  String workType = 'INDEPENDIENTE';
+  bool isActive = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialData;
+    final names = initial?.fullName.split(' ') ?? const [];
+    firstNameCtrl = TextEditingController(text: initial?.firstName ?? '');
+    lastNameCtrl = TextEditingController(text: initial?.lastName ?? '');
+    emailCtrl = TextEditingController(text: initial?.email ?? '');
+    phoneCtrl = TextEditingController(text: initial?.phone ?? '');
+    usernameCtrl = TextEditingController(text: initial?.username ?? '');
+    assignedNumberCtrl = TextEditingController(text: initial?.assignedNumber == null || initial!.assignedNumber == 0 ? '' : '${initial.assignedNumber}');
+    passwordCtrl = TextEditingController();
+    status = initial?.status ?? 'DISPONIBLE';
+    workType = initial?.workType ?? 'INDEPENDIENTE';
+    isActive = initial?.isActive ?? true;
+  }
+
+  @override
+  void dispose() {
+    firstNameCtrl.dispose();
+    lastNameCtrl.dispose();
+    emailCtrl.dispose();
+    phoneCtrl.dispose();
+    usernameCtrl.dispose();
+    assignedNumberCtrl.dispose();
+    passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final firstName = firstNameCtrl.text.trim();
+    final lastName = lastNameCtrl.text.trim();
+    final email = emailCtrl.text.trim();
+    final assignedNumber = int.tryParse(assignedNumberCtrl.text.trim());
+    final isEditing = widget.initialData != null;
+
+    if (firstName.isEmpty || lastName.isEmpty || email.isEmpty || assignedNumber == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Completa nombre, correo y número de domiciliario')),
+      );
+      return;
+    }
+
+    if (!isEditing && passwordCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La contraseña es obligatoria para crear')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(<String, dynamic>{
+      'first_name': firstName,
+      'last_name': lastName,
+      'email': email,
+      'phone': phoneCtrl.text.trim(),
+      'username': usernameCtrl.text.trim(),
+      'assigned_number': assignedNumber,
+      'status': status,
+      'work_type': workType,
+      'is_active': isActive,
+      if (passwordCtrl.text.trim().isNotEmpty) 'password': passwordCtrl.text.trim(),
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: Text(widget.initialData == null ? 'Crear domiciliario' : 'Editar domiciliario'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppTextField(controller: firstNameCtrl, label: 'Nombre'),
+            const SizedBox(height: 12),
+            AppTextField(controller: lastNameCtrl, label: 'Apellidos'),
+            const SizedBox(height: 12),
+            AppTextField(controller: emailCtrl, label: 'Correo', keyboardType: TextInputType.emailAddress),
+            const SizedBox(height: 12),
+            AppTextField(controller: phoneCtrl, label: 'Teléfono', keyboardType: TextInputType.phone),
+            const SizedBox(height: 12),
+            AppTextField(controller: usernameCtrl, label: 'Usuario', hintText: 'Opcional'),
+            const SizedBox(height: 12),
+            AppTextField(controller: assignedNumberCtrl, label: 'Número asignado', keyboardType: TextInputType.number),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: status,
+              decoration: const InputDecoration(labelText: 'Estado', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'DISPONIBLE', child: Text('Disponible')),
+                DropdownMenuItem(value: 'OCUPADO', child: Text('Ocupado')),
+                DropdownMenuItem(value: 'INACTIVO', child: Text('Inactivo')),
+              ],
+              onChanged: (value) => setState(() => status = value ?? 'DISPONIBLE'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: workType,
+              decoration: const InputDecoration(labelText: 'Tipo de trabajo', border: OutlineInputBorder()),
+              items: const [
+                DropdownMenuItem(value: 'INDEPENDIENTE', child: Text('Independiente')),
+                DropdownMenuItem(value: 'EMPRESA', child: Text('Con la empresa')),
+              ],
+              onChanged: (value) => setState(() => workType = value ?? 'INDEPENDIENTE'),
+            ),
+            const SizedBox(height: 12),
+            AppTextField(
+              controller: passwordCtrl,
+              label: widget.initialData == null ? 'Contraseña' : 'Nueva contraseña (opcional)',
+              hintText: widget.initialData == null ? 'Obligatoria al crear' : 'Dejar vacío para mantener',
+              obscureText: true,
+            ),
+            const SizedBox(height: 12),
+            CheckboxListTile(
+              value: isActive,
+              onChanged: (v) => setState(() => isActive = v ?? true),
+              title: const Text('Activo'),
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Guardar'),
+        ),
+      ],
     );
   }
 }

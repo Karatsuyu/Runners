@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/media_url.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../store/presentation/providers/store_provider.dart';
@@ -135,8 +136,14 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.person_outline),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
+                    backgroundImage: resolveMediaUrl(user?.profileImageUrl) != null
+                        ? NetworkImage(resolveMediaUrl(user?.profileImageUrl)!)
+                        : null,
+                    child: resolveMediaUrl(user?.profileImageUrl) == null
+                        ? const Icon(Icons.person_outline)
+                        : null,
                   ),
                   title: Text(
                     user?.fullName.isNotEmpty == true

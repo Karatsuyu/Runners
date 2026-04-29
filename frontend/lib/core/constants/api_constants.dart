@@ -79,6 +79,7 @@ class ApiConstants {
 
   // Admin
   static const String manageProviders = '/services/providers/admin/';
-  static const String manageCommerces = '/store/commerces/admin/';
+  static const String manageCommerces = '/store/admin/commerces/';
+  static const String manageDeliverers = '/deliveries/admin/deliverers/';
   static const String manageProducts = '/store/products/admin/';
 }

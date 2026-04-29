@@ -26,8 +26,8 @@ class CommerceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Commerce
-        fields = ['id', 'category', 'category_name', 'name', 'description', 'phone', 'address', 'image', 'is_active', 'products_count']
-        read_only_fields = ['id']
+        fields = ['id', 'category', 'category_name', 'name', 'description', 'phone', 'address', 'image', 'menu_pdf', 'is_active', 'products_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'products_count', 'category_name']
 
     def get_products_count(self, obj):
         return obj.products.filter(is_available=True).count()

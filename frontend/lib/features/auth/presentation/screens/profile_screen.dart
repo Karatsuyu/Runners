@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/utils/media_url.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 
@@ -112,9 +113,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     final imageProvider = _newImagePath != null
         ? FileImage(File(_newImagePath!)) as ImageProvider
-        : (user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty
-              ? NetworkImage(user.profileImageUrl!)
-              : null);
+        : (resolveMediaUrl(user.profileImageUrl) != null
+          ? NetworkImage(resolveMediaUrl(user.profileImageUrl)!)
+          : null);
 
     return Scaffold(
       backgroundColor: AppColors.background,

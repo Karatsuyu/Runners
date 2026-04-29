@@ -15,6 +15,7 @@ import '../../features/services/presentation/screens/services_screens.dart';
 import '../../features/deliveries/presentation/screens/deliveries_screens.dart';
 import '../../features/contacts/presentation/screens/contacts_screen.dart';
 import '../../features/admin/presentation/screens/admin_screens.dart';
+import '../../features/admin/presentation/screens/store_admin_screen.dart';
 import '../../shared/widgets/app_shells.dart';
 
 /// Bridges Riverpod [AuthState] changes → [ChangeNotifier] for GoRouter.
@@ -223,7 +224,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.manageStore,
-            builder: (context, state) => const ManageStoreScreen(),
+            builder: (context, state) => const StoreAdminListScreen(),
           ),
           GoRoute(
             path: AppRoutes.manageContacts,

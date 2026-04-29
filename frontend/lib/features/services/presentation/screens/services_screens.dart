@@ -10,6 +10,7 @@ import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../core/utils/media_url.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
 
@@ -125,8 +126,14 @@ class ServicesScreen extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.person_outline),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
+                    backgroundImage: resolveMediaUrl(user?.profileImageUrl) != null
+                        ? NetworkImage(resolveMediaUrl(user?.profileImageUrl)!)
+                        : null,
+                    child: resolveMediaUrl(user?.profileImageUrl) == null
+                        ? const Icon(Icons.person_outline)
+                        : null,
                   ),
                   title: Text(
                     user?.fullName.isNotEmpty == true

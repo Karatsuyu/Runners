@@ -26,6 +26,7 @@ class Commerce(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     address = models.CharField(max_length=255, blank=True)
     image = models.ImageField(upload_to='store/commerces/', blank=True, null=True)
+    menu_pdf = models.FileField(upload_to='store/menus/', blank=True, null=True, help_text='Carta o menú en PDF')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

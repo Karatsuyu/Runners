@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/store_provider.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/utils/media_url.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 
@@ -22,6 +24,123 @@ void _redirectGuestToLogin(BuildContext context) {
 
 class StoreScreen extends ConsumerWidget {
   const StoreScreen({super.key});
+
+  bool _isImageMenu(String? url) {
+    if (url == null || url.isEmpty) return false;
+    final path = Uri.parse(url).path.toLowerCase();
+    return path.endsWith('.jpg') ||
+        path.endsWith('.jpeg') ||
+        path.endsWith('.png') ||
+        path.endsWith('.webp');
+  }
+
+  Widget _buildCommerceAvatar(CommerceModel commerce) {
+    final imageUrl = resolveMediaUrl(commerce.image);
+    
+    // If we have an image URL, show it; otherwise show icon
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundColor: AppColors.primaryGreen.withAlpha(20),
+        backgroundImage: NetworkImage(imageUrl),
+      );
+    }
+    
+    // Default icon if no image
+    return CircleAvatar(
+      radius: 24,
+      backgroundColor: AppColors.primaryGreen.withAlpha(20),
+      child: const Icon(
+        Icons.store_rounded,
+        color: AppColors.primaryGreen,
+      ),
+    );
+  }
+
+  void _openMenu(BuildContext context, String? menuUrl) {
+    final resolvedUrl = resolveMediaUrl(menuUrl);
+    if (resolvedUrl == null) return;
+    
+    // Open URLs in app for PDFs and images
+    launchUrl(
+      Uri.parse(resolvedUrl),
+      mode: LaunchMode.inAppWebView,
+    );
+  }
+
+  Widget _buildMenuPreview(BuildContext context, CommerceModel commerce) {
+    final menuUrl = resolveMediaUrl(commerce.menuPdf);
+    if (menuUrl == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isImage = _isImageMenu(menuUrl);
+
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.primaryGreen.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.primaryGreen.withValues(alpha: 0.14),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.menu_book_outlined,
+                size: 18,
+                color: AppColors.primaryGreen,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Carta disponible',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _openMenu(context, commerce.menuPdf),
+                child: const Text('Abrir'),
+              ),
+            ],
+          ),
+          if (isImage)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.network(
+                  menuUrl,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    height: 180,
+                    child: Center(child: Text('No se pudo cargar la carta')),
+                  ),
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'La carta está en PDF y se abre con un toque.',
+                style: TextStyle(
+                  color: AppColors.textSecondary.withValues(alpha: 0.95),
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _openProfileMenu(
     BuildContext context,
@@ -40,8 +159,17 @@ class StoreScreen extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.person_outline),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryGreen.withValues(
+                      alpha: 0.1,
+                    ),
+                    backgroundImage:
+                        resolveMediaUrl(user?.profileImageUrl) != null
+                        ? NetworkImage(resolveMediaUrl(user?.profileImageUrl)!)
+                        : null,
+                    child: resolveMediaUrl(user?.profileImageUrl) == null
+                        ? const Icon(Icons.person_outline)
+                        : null,
                   ),
                   title: Text(
                     user?.fullName.isNotEmpty == true
@@ -297,31 +425,104 @@ class StoreScreen extends ConsumerWidget {
                           final c = commerces[i];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primaryGreen
-                                    .withAlpha(20),
-                                child: const Icon(
-                                  Icons.store_rounded,
-                                  color: AppColors.primaryGreen,
-                                ),
-                              ),
-                              title: Text(
-                                c.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              subtitle: Text(
-                                c.description,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 16,
-                              ),
+                            child: InkWell(
                               onTap: () => context.go('/client/store/${c.id}'),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        _buildCommerceAvatar(c),
+                                        // CircleAvatar(
+                                        //   backgroundColor: AppColors
+                                        //       .primaryGreen
+                                        //       .withAlpha(20),
+                                        //   child: const Icon(
+                                        //     Icons.store_rounded,
+                                        //     color: AppColors.primaryGreen,
+                                        //   ),
+                                        // ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                c.name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                              Text(
+                                                c.description,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                    _buildMenuPreview(context, c),
+                                    if (c.phone.isNotEmpty ||
+                                        c.address.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 10),
+                                        child: Wrap(
+                                          spacing: 12,
+                                          runSpacing: 6,
+                                          children: [
+                                            if (c.phone.isNotEmpty)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.phone_outlined,
+                                                    size: 14,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    c.phone,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            if (c.address.isNotEmpty)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on_outlined,
+                                                    size: 14,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    c.address,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -352,8 +553,91 @@ class CommerceDetailScreen extends ConsumerWidget {
   final int commerceId;
   const CommerceDetailScreen({super.key, required this.commerceId});
 
+  Future<void> _openMenu(String url) async {
+    final uri = Uri.parse(url);
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  bool _isImageUrl(String url) {
+    final lower = Uri.parse(url).path.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp');
+  }
+
+  Widget _buildMenuSection(BuildContext context, CommerceModel commerce) {
+    final menuUrl = resolveMediaUrl(commerce.menuPdf);
+    if (menuUrl == null) return const SizedBox.shrink();
+
+    final isImage = _isImageUrl(menuUrl);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Carta del restaurante',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            if (isImage)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  menuUrl,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => const SizedBox(
+                    height: 140,
+                    child: Center(child: Text('No se pudo cargar la carta')),
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGreen.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.primaryGreen.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.picture_as_pdf_outlined,
+                      color: AppColors.primaryGreen,
+                      size: 36,
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'La carta está disponible como PDF. Puedes abrirla para verla completa.',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _openMenu(menuUrl),
+                      child: const Text('Ver carta'),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final commerceAsync = ref.watch(commerceDetailProvider(commerceId));
     final productsAsync = ref.watch(commerceProductsProvider(commerceId));
     final cart = ref.watch(cartProvider);
     final isGuest = ref.watch(authProvider).isGuest;
@@ -392,173 +676,178 @@ class CommerceDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: productsAsync.when(
+      body: commerceAsync.when(
         loading: () => const AppLoading(),
         error: (e, _) => AppErrorWidget(
-          message: 'Error al cargar productos',
-          onRetry: () => ref.invalidate(commerceProductsProvider(commerceId)),
+          message: 'Error al cargar el comercio',
+          onRetry: () => ref.invalidate(commerceDetailProvider(commerceId)),
         ),
-        data: (products) => products.isEmpty
-            ? const AppEmptyState(
-                icon: Icons.inventory_2_outlined,
-                title: 'Sin productos',
-                subtitle: 'Este comercio aún no tiene productos registrados.',
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: products.length,
-                itemBuilder: (_, i) {
-                  final p = products[i];
-                  final inCart = cart.indexWhere((c) => c.productId == p.id);
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 28,
-                            backgroundColor: AppColors.primaryGreen.withAlpha(
-                              15,
+        data: (commerce) => productsAsync.when(
+          loading: () => const AppLoading(),
+          error: (e, _) => AppErrorWidget(
+            message: 'Error al cargar productos',
+            onRetry: () => ref.invalidate(commerceProductsProvider(commerceId)),
+          ),
+          data: (products) => ListView(
+            children: [
+              _buildMenuSection(context, commerce),
+              if (products.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: AppEmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'Sin productos',
+                    subtitle:
+                        'Este comercio aún no tiene productos registrados.',
+                  ),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(12),
+                  itemCount: products.length,
+                  itemBuilder: (_, i) {
+                    final p = products[i];
+                    final inCart = cart.indexWhere((c) => c.productId == p.id);
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: AppColors.primaryGreen.withAlpha(
+                                15,
+                              ),
+                              child: const Icon(
+                                Icons.fastfood_rounded,
+                                color: AppColors.primaryGreen,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.fastfood_rounded,
-                              color: AppColors.primaryGreen,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  p.name,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                if (p.description.isNotEmpty)
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
                                   Text(
-                                    p.description,
+                                    p.name,
                                     style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                Text(
-                                  currency.format(p.price),
-                                  style: const TextStyle(
-                                    color: AppColors.primaryGreen,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!p.isAvailable)
-                            const Text(
-                              'No disponible',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                              ),
-                            )
-                          else if (inCart >= 0)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.remove_circle,
-                                    color: AppColors.error,
-                                  ),
-                                  onPressed: () => ref
-                                      .read(cartProvider.notifier)
-                                      .decreaseQuantity(p.id),
-                                ),
-                                Text(
-                                  '${cart[inCart].quantity}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.add_circle,
-                                    color: AppColors.primaryGreen,
-                                  ),
-                                  onPressed: () {
-                                    if (isGuest) {
-                                      _redirectGuestToLogin(context);
-                                      return;
-                                    }
-                                    ref
-                                        .read(cartProvider.notifier)
-                                        .addItem(
-                                          OrderItemInput(
-                                            productId: p.id,
-                                            productName: p.name,
-                                            unitPrice: p.price,
-                                            quantity: 1,
-                                          ),
-                                          commerceId,
-                                        );
-                                  },
-                                ),
-                              ],
-                            )
-                          else
-                            ElevatedButton(
-                              onPressed: () {
-                                if (isGuest) {
-                                  _redirectGuestToLogin(context);
-                                  return;
-                                }
-                                ref
-                                    .read(cartProvider.notifier)
-                                    .addItem(
-                                      OrderItemInput(
-                                        productId: p.id,
-                                        productName: p.name,
-                                        unitPrice: p.price,
-                                        quantity: 1,
+                                  if (p.description.isNotEmpty)
+                                    Text(
+                                      p.description,
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
                                       ),
-                                      commerceId,
-                                    );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryGreen,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                                minimumSize: Size.zero,
-                              ),
-                              child: const Text(
-                                '+',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  Text(
+                                    currency.format(p.price),
+                                    style: const TextStyle(
+                                      color: AppColors.primaryGreen,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                        ],
+                            if (!p.isAvailable)
+                              const Text(
+                                'No disponible',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 11,
+                                ),
+                              )
+                            else if (inCart >= 0)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.remove_circle,
+                                      color: AppColors.error,
+                                    ),
+                                    onPressed: () => ref
+                                        .read(cartProvider.notifier)
+                                        .decreaseQuantity(p.id),
+                                  ),
+                                  Text(
+                                    '${cart[inCart].quantity}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.add_circle,
+                                      color: AppColors.primaryGreen,
+                                    ),
+                                    onPressed: () {
+                                      if (isGuest) {
+                                        _redirectGuestToLogin(context);
+                                        return;
+                                      }
+                                      ref
+                                          .read(cartProvider.notifier)
+                                          .addItem(
+                                            OrderItemInput(
+                                              productId: p.id,
+                                              productName: p.name,
+                                              unitPrice: p.price,
+                                              quantity: 1,
+                                            ),
+                                            commerceId,
+                                          );
+                                    },
+                                  ),
+                                ],
+                              )
+                            else
+                              ElevatedButton(
+                                onPressed: () {
+                                  if (isGuest) {
+                                    _redirectGuestToLogin(context);
+                                    return;
+                                  }
+                                  ref
+                                      .read(cartProvider.notifier)
+                                      .addItem(
+                                        OrderItemInput(
+                                          productId: p.id,
+                                          productName: p.name,
+                                          unitPrice: p.price,
+                                          quantity: 1,
+                                        ),
+                                        commerceId,
+                                      );
+                                },
+                                child: const Text('Agregar'),
+                              ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// ── Cart Screen ──────────────────────────────────────────────────────────
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
+
   @override
   ConsumerState<CartScreen> createState() => _CartScreenState();
 }
