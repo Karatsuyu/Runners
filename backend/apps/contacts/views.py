@@ -226,3 +226,25 @@ def review_contact(request, pk):
     contact.reviewed_at = timezone.now()
     contact.save()
     return Response(ContactSerializer(contact, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def toggle_contact_status(request, pk):
+    try:
+        contact = Contact.objects.get(pk=pk)
+    except Contact.DoesNotExist:
+        return Response({'error': 'Contacto no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    contact.is_active = not contact.is_active
+    contact.save(update_fields=['is_active', 'updated_at'])
+
+    state = 'activado' if contact.is_active else 'desactivado'
+    return Response(
+        {
+            'message': f'Contacto {state} exitosamente.',
+            'id': contact.id,
+            'is_active': contact.is_active,
+        },
+        status=status.HTTP_200_OK,
+    )

@@ -8,8 +8,9 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/auth_usecases.dart';
 
 // ─── Providers de infraestructura ─────────────────────────────────────────
-final secureStorageProvider =
-    Provider<SecureStorageService>((_) => SecureStorageService());
+final secureStorageProvider = Provider<SecureStorageService>(
+  (_) => SecureStorageService(),
+);
 
 final dioClientProvider = Provider<DioClient>((ref) {
   final storage = ref.read(secureStorageProvider);
@@ -25,16 +26,31 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 // ─── Use Cases ─────────────────────────────────────────────────────────────
 final loginUseCaseProvider = Provider<LoginUseCase>(
-    (ref) => LoginUseCase(ref.read(authRepositoryProvider)));
+  (ref) => LoginUseCase(ref.read(authRepositoryProvider)),
+);
 
 final registerUseCaseProvider = Provider<RegisterUseCase>(
-    (ref) => RegisterUseCase(ref.read(authRepositoryProvider)));
+  (ref) => RegisterUseCase(ref.read(authRepositoryProvider)),
+);
 
 final logoutUseCaseProvider = Provider<LogoutUseCase>(
-    (ref) => LogoutUseCase(ref.read(authRepositoryProvider)));
+  (ref) => LogoutUseCase(ref.read(authRepositoryProvider)),
+);
 
 final updateProfileUseCaseProvider = Provider<UpdateProfileUseCase>(
-  (ref) => UpdateProfileUseCase(ref.read(authRepositoryProvider)));
+  (ref) => UpdateProfileUseCase(ref.read(authRepositoryProvider)),
+);
+
+final requestPasswordResetCodeUseCaseProvider =
+    Provider<RequestPasswordResetCodeUseCase>(
+      (ref) =>
+          RequestPasswordResetCodeUseCase(ref.read(authRepositoryProvider)),
+    );
+
+final confirmPasswordResetUseCaseProvider =
+    Provider<ConfirmPasswordResetUseCase>(
+      (ref) => ConfirmPasswordResetUseCase(ref.read(authRepositoryProvider)),
+    );
 
 // ─── Estado de autenticación ──────────────────────────────────────────────
 class AuthState {
@@ -58,13 +74,12 @@ class AuthState {
     bool? isGuest,
     bool? isLoading,
     String? error,
-  }) =>
-      AuthState(
-        user: removeUser ? null : (user ?? this.user),
-        isGuest: isGuest ?? this.isGuest,
-        isLoading: isLoading ?? this.isLoading,
-        error: error,
-      );
+  }) => AuthState(
+    user: removeUser ? null : (user ?? this.user),
+    isGuest: isGuest ?? this.isGuest,
+    isLoading: isLoading ?? this.isLoading,
+    error: error,
+  );
 
   AuthState clearUser() => AuthState(isLoading: false);
 }
@@ -74,42 +89,66 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final RegisterUseCase _registerUseCase;
   final LogoutUseCase _logoutUseCase;
   final UpdateProfileUseCase _updateProfileUseCase;
+  final RequestPasswordResetCodeUseCase _requestPasswordResetCodeUseCase;
+  final ConfirmPasswordResetUseCase _confirmPasswordResetUseCase;
   final AuthRepository _authRepository;
+  final SecureStorageService _secureStorage;
 
   AuthNotifier({
     required LoginUseCase loginUseCase,
     required RegisterUseCase registerUseCase,
     required LogoutUseCase logoutUseCase,
     required UpdateProfileUseCase updateProfileUseCase,
+    required RequestPasswordResetCodeUseCase requestPasswordResetCodeUseCase,
+    required ConfirmPasswordResetUseCase confirmPasswordResetUseCase,
     required AuthRepository authRepository,
-  })  : _loginUseCase = loginUseCase,
-        _registerUseCase = registerUseCase,
-        _logoutUseCase = logoutUseCase,
-        _updateProfileUseCase = updateProfileUseCase,
-        _authRepository = authRepository,
-        super(const AuthState());
+    required SecureStorageService secureStorage,
+  }) : _loginUseCase = loginUseCase,
+       _registerUseCase = registerUseCase,
+       _logoutUseCase = logoutUseCase,
+       _updateProfileUseCase = updateProfileUseCase,
+       _requestPasswordResetCodeUseCase = requestPasswordResetCodeUseCase,
+       _confirmPasswordResetUseCase = confirmPasswordResetUseCase,
+       _authRepository = authRepository,
+       _secureStorage = secureStorage,
+       super(const AuthState());
 
   Future<bool> checkAuthStatus() async {
     final result = await _authRepository.getProfile();
-    return result.fold(
-      (_) => false,
-      (user) {
-        state = state.copyWith(user: user, isGuest: false);
-        return true;
-      },
-    );
+    return result.fold((_) => false, (user) {
+      state = state.copyWith(user: user, isGuest: false);
+      return true;
+    });
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(
+    String email,
+    String password, {
+    required bool rememberMe,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await _loginUseCase(email, password);
-      return result.fold(
-        (failure) {
+      return await result.fold(
+        (failure) async {
           state = state.copyWith(isLoading: false, error: failure.message);
           return false;
         },
-        (user) {
+        (user) async {
+          // Si falla el guardado local, no bloqueamos el login remoto exitoso.
+          try {
+            if (rememberMe) {
+              await _secureStorage.saveRememberedCredentials(
+                email: email,
+                password: password,
+              );
+            } else {
+              await _secureStorage.clearRememberedCredentials();
+            }
+          } catch (_) {
+            // Ignorado intencionalmente.
+          }
+
           state = state.copyWith(isLoading: false, user: user, isGuest: false);
           return true;
         },
@@ -159,15 +198,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String firstName,
     required String lastName,
     String? phone,
+    String? username,
+    String? profileImagePath,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    final payload = <String, String>{
-      'first_name': firstName,
-      'last_name': lastName,
-      'phone': phone?.trim() ?? '',
-    };
-
-    final result = await _updateProfileUseCase(payload);
+    final result = await _updateProfileUseCase(
+      firstName: firstName,
+      lastName: lastName,
+      phone: phone,
+      username: username,
+      profileImagePath: profileImagePath,
+    );
     return result.fold(
       (failure) {
         state = state.copyWith(isLoading: false, error: failure.message);
@@ -179,15 +220,60 @@ class AuthNotifier extends StateNotifier<AuthState> {
       },
     );
   }
+
+  Future<String?> requestPasswordResetCode(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await _requestPasswordResetCodeUseCase(email);
+    return result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, error: failure.message);
+        return failure.message;
+      },
+      (_) {
+        state = state.copyWith(isLoading: false, error: null);
+        return null;
+      },
+    );
+  }
+
+  Future<String?> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPassword2,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    final result = await _confirmPasswordResetUseCase(
+      email: email,
+      code: code,
+      newPassword: newPassword,
+      newPassword2: newPassword2,
+    );
+
+    return result.fold(
+      (failure) {
+        state = state.copyWith(isLoading: false, error: failure.message);
+        return failure.message;
+      },
+      (_) {
+        state = state.copyWith(isLoading: false, error: null);
+        return null;
+      },
+    );
+  }
 }
 
-final authProvider =
-    StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     loginUseCase: ref.read(loginUseCaseProvider),
     registerUseCase: ref.read(registerUseCaseProvider),
     logoutUseCase: ref.read(logoutUseCaseProvider),
     updateProfileUseCase: ref.read(updateProfileUseCaseProvider),
+    requestPasswordResetCodeUseCase: ref.read(
+      requestPasswordResetCodeUseCaseProvider,
+    ),
+    confirmPasswordResetUseCase: ref.read(confirmPasswordResetUseCaseProvider),
     authRepository: ref.read(authRepositoryProvider),
+    secureStorage: ref.read(secureStorageProvider),
   );
 });

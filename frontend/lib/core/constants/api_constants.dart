@@ -6,8 +6,8 @@ class ApiConstants {
     final defaultUrl = 'http://10.0.2.2:8000/api/v1';
     final rawBaseUrl =
         (kIsWeb ? dotenv.env['API_BASE_URL_WEB'] : null) ??
-            dotenv.env['API_BASE_URL'] ??
-            defaultUrl;
+        dotenv.env['API_BASE_URL'] ??
+        defaultUrl;
 
     // 10.0.2.2 is only valid inside Android emulator.
     if (kIsWeb && rawBaseUrl.contains('10.0.2.2')) {
@@ -23,8 +23,11 @@ class ApiConstants {
   static const String tokenRefresh = '/auth/token/refresh/';
   static const String logout = '/auth/logout/';
   static const String profile = '/auth/profile/';
+  static const String passwordResetRequest = '/auth/password-reset/request/';
+  static const String passwordResetConfirm = '/auth/password-reset/confirm/';
   static const String users = '/auth/users/';
   static String toggleUserStatus(int id) => '/auth/users/$id/toggle-status/';
+  static String toggleDelivererStatus(int id) => '/deliveries/deliverers/$id/toggle-status/';
 
   // Store
   static const String categories = '/store/categories/';
@@ -54,6 +57,8 @@ class ApiConstants {
   static String approveDelivery(int id) => '/deliveries/requests/$id/approve/';
   static String completeDelivery(int id) => '/deliveries/requests/$id/complete/';
   static String deliveryChat(int id) => '/deliveries/requests/$id/chat/';
+  static String completeDelivery(int id) =>
+      '/deliveries/requests/$id/complete/';
   static const String financialRecords = '/deliveries/records/';
   static const String myDeliveries = '/deliveries/requests/my-deliveries/';
 
@@ -77,6 +82,7 @@ class ApiConstants {
 
   // Admin
   static const String manageProviders = '/services/providers/admin/';
-  static const String manageCommerces = '/store/commerces/admin/';
+  static const String manageCommerces = '/store/admin/commerces/';
+  static const String manageDeliverers = '/deliveries/admin/deliverers/';
   static const String manageProducts = '/store/products/admin/';
 }

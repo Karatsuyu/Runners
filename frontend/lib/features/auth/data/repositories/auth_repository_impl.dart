@@ -14,7 +14,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, UserEntity>> login(
-      String email, String password) async {
+    String email,
+    String password,
+  ) async {
     try {
       final data = await _remoteDataSource.login(email, password);
       await _storage.saveTokens(
@@ -35,8 +37,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, UserEntity>> register(
-      Map<String, String> data) async {
+  Future<Either<Failure, UserEntity>> register(Map<String, String> data) async {
     try {
       final response = await _remoteDataSource.register(data);
       // El backend puede retornar tokens directamente o dentro de 'tokens'
@@ -73,10 +74,21 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, UserEntity>> updateProfile(
-      Map<String, String> data) async {
+  Future<Either<Failure, UserEntity>> updateProfile({
+    required String firstName,
+    required String lastName,
+    String? phone,
+    String? username,
+    String? profileImagePath,
+  }) async {
     try {
-      final user = await _remoteDataSource.updateProfile(data);
+      final user = await _remoteDataSource.updateProfile(
+        firstName: firstName,
+        lastName: lastName,
+        phone: phone,
+        username: username,
+        profileImagePath: profileImagePath,
+      );
       return Right(user.toEntity());
     } on NetworkException catch (e) {
       return Left(NetworkFailure(message: e.message));
@@ -96,11 +108,53 @@ class AuthRepositoryImpl implements AuthRepository {
       if (refreshToken != null) {
         await _remoteDataSource.logout(refreshToken);
       }
-      await _storage.clearAll();
+      await _storage.clearSession();
       return const Right(null);
     } catch (_) {
-      await _storage.clearAll();
+      await _storage.clearSession();
       return const Right(null);
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> requestPasswordResetCode(String email) async {
+    try {
+      await _remoteDataSource.requestPasswordResetCode(email);
+      return const Right(null);
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(message: e.firstError));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> confirmPasswordReset({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPassword2,
+  }) async {
+    try {
+      await _remoteDataSource.confirmPasswordReset(
+        email: email,
+        code: code,
+        newPassword: newPassword,
+        newPassword2: newPassword2,
+      );
+      return const Right(null);
+    } on NetworkException catch (e) {
+      return Left(NetworkFailure(message: e.message));
+    } on ValidationException catch (e) {
+      return Left(ValidationFailure(message: e.firstError));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
     }
   }
 }

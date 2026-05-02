@@ -43,6 +43,32 @@ class CommerceDetailView(generics.RetrieveUpdateDestroyAPIView):
         return CommerceSerializer
 
 
+class CommerceAdminListView(generics.ListCreateAPIView):
+    """Vista para administradores: acceso total a todas las tiendas (activas e inactivas)"""
+    queryset = Commerce.objects.all()
+    serializer_class = CommerceSerializer
+    permission_classes = [IsAdmin]
+
+    def get_queryset(self):
+        queryset = Commerce.objects.all()
+        category = self.request.query_params.get('category')
+        is_active = self.request.query_params.get('is_active')
+        
+        if category:
+            queryset = queryset.filter(category_id=category)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        return queryset.order_by('-created_at')
+
+
+class CommerceAdminDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Vista para administradores: edición/eliminación completa de tiendas"""
+    queryset = Commerce.objects.all()
+    serializer_class = CommerceSerializer
+    permission_classes = [IsAdmin]
+
+
 class ProductListView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]

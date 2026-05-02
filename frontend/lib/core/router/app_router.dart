@@ -5,7 +5,9 @@ import '../router/app_routes.dart';
 import '../../features/auth/domain/entities/user_entity.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/profile_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/store/presentation/screens/store_screens.dart';
 import '../../features/store/presentation/screens/order_confirm_screen.dart';
@@ -13,6 +15,7 @@ import '../../features/services/presentation/screens/services_screens.dart';
 import '../../features/deliveries/presentation/screens/deliveries_screens.dart';
 import '../../features/contacts/presentation/screens/contacts_screen.dart';
 import '../../features/admin/presentation/screens/admin_screens.dart';
+import '../../features/admin/presentation/screens/store_admin_screen.dart';
 import '../../shared/widgets/app_shells.dart';
 
 /// Bridges Riverpod [AuthState] changes → [ChangeNotifier] for GoRouter.
@@ -35,7 +38,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isGuest = authState.isGuest;
       final location = state.matchedLocation;
 
-      final publicRoutes = [AppRoutes.splash, AppRoutes.login, AppRoutes.register];
+      final publicRoutes = [
+        AppRoutes.splash,
+        AppRoutes.login,
+        AppRoutes.register,
+        AppRoutes.forgotPassword,
+      ];
       final isPublic = publicRoutes.contains(location);
       final isClientRoute = location.startsWith('/client/');
       final guestBlockedRoutes = [
@@ -43,13 +51,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         AppRoutes.orderHistory,
         AppRoutes.orderConfirm,
       ];
-      final isGuestBlockedRoute =
-          guestBlockedRoutes.any((route) => location.startsWith(route));
+      final isGuestBlockedRoute = guestBlockedRoutes.any(
+        (route) => location.startsWith(route),
+      );
 
       if (!isAuth && !isGuest && !isPublic) return AppRoutes.login;
 
       if (isGuest && !isPublic && !isClientRoute) return AppRoutes.login;
       if (isGuest && isGuestBlockedRoute) return AppRoutes.login;
+
+      // Privacy hard-stop: disable admin users management route.
+      if (location.startsWith('/admin/users')) return AppRoutes.adminDashboard;
 
       if (isAuth && isPublic && location != AppRoutes.splash) {
         return _homeForRole(authState.user?.role);
@@ -72,6 +84,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.register,
         builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profile,
+        builder: (context, state) => const ProfileScreen(),
       ),
 
       // ── Client Shell ───────────────────────────────────────────────────
@@ -111,6 +131,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: AppRoutes.contacts,
             builder: (context, state) => const ContactsScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.clientProfile,
+            builder: (context, state) => const ProfileScreen(),
           ),
           GoRoute(
             path: AppRoutes.orderHistory,
@@ -200,7 +224,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: AppRoutes.manageStore,
-            builder: (context, state) => const ManageStoreScreen(),
+            builder: (context, state) => const StoreAdminListScreen(),
           ),
           GoRoute(
             path: AppRoutes.manageContacts,
