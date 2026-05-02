@@ -932,15 +932,39 @@ class _ActiveDeliveryCard extends ConsumerStatefulWidget {
 
 class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
   bool _completing = false;
-
   Future<void> _updateDelivery({bool? isDelivered, bool? isPaid}) async {
     setState(() => _completing = true);
     try {
-      await ref.read(deliveriesDataSourceProvider).completeDelivery(
-            widget.delivery.id,
-            isDelivered: isDelivered,
-            isPaid: isPaid,
-          );
+      await ref
+          .read(deliveriesDataSourceProvider)
+          .completeDelivery(widget.delivery.id,
+              isDelivered: isDelivered, isPaid: isPaid);
+
+      ref.invalidate(myDeliveriesProvider);
+      ref.invalidate(myDelivererProfileProvider);
+      ref.invalidate(financialRecordsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Estado del domicilio actualizado'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _completing = false);
+    }
+  }
+
   Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1042,6 +1066,10 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
                   onChanged: _completing
                       ? null
                       : (v) => _updateDelivery(isDelivered: v),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -1061,7 +1089,7 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                 ),
-              ],
+              ),
             ),
             Row(
               children: [
