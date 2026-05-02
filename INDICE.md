@@ -4,6 +4,13 @@
 
 Empeza aquí según lo que necesites:
 
+### Para Ver Todo el Proyecto en un Solo Documento
+👉 **[DOCUMENTACION_MAESTRA_RUNNERS.md](DOCUMENTACION_MAESTRA_RUNNERS.md)** - Consolidado integral
+- Problema, justificación, objetivos y alcance
+- Requisitos funcionales y no funcionales
+- Arquitectura, tecnologías, estructura, flujos y API
+- Operación, riesgos, gestión y estado general
+
 ### Para Ejecutar la Aplicación
 👉 **[QUICKSTART.md](QUICKSTART.md)** - Guía rápida (2 minutos)
 - Cómo ejecutar Backend + Frontend

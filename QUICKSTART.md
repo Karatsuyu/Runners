@@ -1,5 +1,11 @@
 # 🚀 Quick Start - Runners
 
+## 📘 Documento Maestro
+
+Si necesitas toda la información consolidada del proyecto en un solo lugar:
+
+- [DOCUMENTACION_MAESTRA_RUNNERS.md](DOCUMENTACION_MAESTRA_RUNNERS.md)
+
 ## 🎯 Ejecutar Ambos (Frontend + Backend)
 
 ### Opción 1: Dos Terminales (Recomendado)

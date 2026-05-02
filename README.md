@@ -161,6 +161,7 @@ Ver archivo: `backend/runners_api_postman.json` (Colección Postman lista para u
 
 ## 📚 Documentación Adicional
 
+- `DOCUMENTACION_MAESTRA_RUNNERS.md` - Documento único consolidado del proyecto
 - `runners_flutter_implementacion.md` - Detalles de implementación Flutter
 - `runners_guia_implementacion_web.md` - Guía backend original
 - `Flutter_Auth_Screens.md` - Documentación de pantallas de auth
