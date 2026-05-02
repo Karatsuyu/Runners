@@ -45,7 +45,19 @@ class DeliveryRequest(models.Model):
         ENTREGADO = 'ENTREGADO', 'Entregado'
         CANCELADO = 'CANCELADO', 'Cancelado'
 
+    class ApprovalStatus(models.TextChoices):
+        PENDIENTE = 'PENDIENTE', 'Pendiente'
+        AUTORIZADO = 'AUTORIZADO', 'Autorizado'
+        RECHAZADO = 'RECHAZADO', 'Rechazado'
+
     client = models.ForeignKey(User, on_delete=models.PROTECT, related_name='delivery_requests')
+    order = models.ForeignKey(
+        'store.Order',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='delivery_requests'
+    )
     deliverer = models.ForeignKey(
         Deliverer,
         on_delete=models.PROTECT,
@@ -56,9 +68,26 @@ class DeliveryRequest(models.Model):
     )
     description = models.TextField(help_text='Descripción del domicilio o favor')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.SOLICITADO)
+    approval_status = models.CharField(
+        max_length=20,
+        choices=ApprovalStatus.choices,
+        default=ApprovalStatus.PENDIENTE
+    )
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_delivery_requests'
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
     pickup_address = models.CharField(max_length=255, blank=True)
     delivery_address = models.CharField(max_length=255, blank=True)
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    admin_delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    is_delivered = models.BooleanField(default=False)
+    is_paid = models.BooleanField(default=False)
+    paid_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -101,6 +130,41 @@ class FinancialRecord(models.Model):
 
     def __str__(self):
         return f'{self.record_type} - ${self.amount} ({self.deliverer})'
+
+
+class DeliveryChatMessage(models.Model):
+    class RecipientRole(models.TextChoices):
+        CLIENTE = User.Role.CLIENTE, 'Cliente'
+        ADMIN = User.Role.ADMIN, 'Administrador'
+        DOMICILIARIO = User.Role.DOMICILIARIO, 'Domiciliario'
+
+    delivery_request = models.ForeignKey(
+        DeliveryRequest,
+        on_delete=models.CASCADE,
+        related_name='chat_messages'
+    )
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_delivery_messages')
+    recipient_role = models.CharField(max_length=20, choices=RecipientRole.choices)
+    message = models.TextField()
+    read_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'deliveries_chat_messages'
+        verbose_name = 'Mensaje de Chat de Domicilio'
+        ordering = ['created_at']
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        sender_role = self.sender.role
+        allowed_pairs = {
+            (User.Role.CLIENTE, User.Role.ADMIN),
+            (User.Role.ADMIN, User.Role.CLIENTE),
+            (User.Role.ADMIN, User.Role.DOMICILIARIO),
+            (User.Role.DOMICILIARIO, User.Role.ADMIN),
+        }
+        if (sender_role, self.recipient_role) not in allowed_pairs:
+            raise ValidationError('Combinación de roles no permitida para chat de domicilios.')
 
 
 class SystemConfig(models.Model):

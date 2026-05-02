@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/notifications_service.dart';
+import '../../../../core/theme/theme_mode_provider.dart';
 import '../../../../core/router/app_routes.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/media_url.dart';
@@ -14,6 +16,8 @@ import '../../../../shared/widgets/app_error_widget.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../providers/deliveries_provider.dart';
+
+final Set<int> _notifiedDeliveryIds = <int>{};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTE: DeliveriesScreen
@@ -268,6 +272,21 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          Consumer(builder: (context, ref, _) {
+            final mode = ref.watch(themeModeProvider);
+            final isDark = mode == ThemeMode.dark;
+            return Row(
+              children: [
+                Icon(isDark ? Icons.nightlight_round : Icons.wb_sunny),
+                Switch(
+                  value: isDark,
+                  onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+                  activeColor: Colors.white,
+                  inactiveThumbColor: Colors.white,
+                ),
+              ],
+            );
+          }),
           Stack(
             children: [
               IconButton(
@@ -502,6 +521,47 @@ class _DeliveryRequestCard extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  request.approvalStatus == 'AUTORIZADO'
+                      ? Icons.verified
+                      : Icons.pending_actions,
+                  size: 14,
+                  color: request.approvalStatus == 'AUTORIZADO'
+                      ? AppColors.success
+                      : AppColors.warning,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Aprobación: ${request.approvalStatus}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+            if (request.adminDeliveryFee != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Valor domicilio: ${AppFormatters.currency(request.adminDeliveryFee!)}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+            const SizedBox(height: 6),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => _DeliveryChatSheet(deliveryId: request.id),
+                  );
+                },
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Chat con Admin'),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(request.createdAt),
@@ -617,6 +677,14 @@ class DelivererDashboardScreen extends ConsumerWidget {
                             d.status != 'completed' && d.status != 'cancelled',
                       )
                       .toList();
+                  for (final delivery in active) {
+                    if (_notifiedDeliveryIds.add(delivery.id)) {
+                      NotificationsService.showDeliveryAssigned(
+                        deliveryId: delivery.id,
+                        address: delivery.deliveryAddress,
+                      );
+                    }
+                  }
                   if (active.isEmpty) {
                     return const AppEmptyState(
                       icon: Icons.check_circle_outline,
@@ -865,6 +933,14 @@ class _ActiveDeliveryCard extends ConsumerStatefulWidget {
 class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
   bool _completing = false;
 
+  Future<void> _updateDelivery({bool? isDelivered, bool? isPaid}) async {
+    setState(() => _completing = true);
+    try {
+      await ref.read(deliveriesDataSourceProvider).completeDelivery(
+            widget.delivery.id,
+            isDelivered: isDelivered,
+            isPaid: isPaid,
+          );
   Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -902,7 +978,7 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Domicilio completado!'),
+            content: Text('Estado del domicilio actualizado'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -958,6 +1034,14 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
             const SizedBox(height: 2),
             _AddressRow(icon: Icons.location_on, text: d.deliveryAddress),
             const SizedBox(height: 10),
+            Row(
+              children: [
+                const Expanded(child: Text('Entregado')),
+                Switch(
+                  value: d.isDelivered,
+                  onChanged: _completing
+                      ? null
+                      : (v) => _updateDelivery(isDelivered: v),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -977,10 +1061,107 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                 ),
-              ),
+              ],
+            ),
+            Row(
+              children: [
+                const Expanded(child: Text('Pagado')),
+                Switch(
+                  value: d.isPaid,
+                  onChanged: (!d.isDelivered || _completing)
+                      ? null
+                      : (v) => _updateDelivery(isPaid: v),
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DeliveryChatSheet extends ConsumerStatefulWidget {
+  final int deliveryId;
+  const _DeliveryChatSheet({required this.deliveryId});
+
+  @override
+  ConsumerState<_DeliveryChatSheet> createState() => _DeliveryChatSheetState();
+}
+
+class _DeliveryChatSheetState extends ConsumerState<_DeliveryChatSheet> {
+  final _messageCtrl = TextEditingController();
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _messageCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    if (_messageCtrl.text.trim().isEmpty) return;
+    setState(() => _sending = true);
+    try {
+      await ref.read(deliveriesDataSourceProvider).sendDeliveryChatMessage(
+            id: widget.deliveryId,
+            message: _messageCtrl.text.trim(),
+            recipientRole: 'ADMIN',
+          );
+      _messageCtrl.clear();
+      setState(() {});
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: FutureBuilder<List<DeliveryChatMessageModel>>(
+        future: ref.read(deliveriesDataSourceProvider).getDeliveryChat(widget.deliveryId),
+        builder: (context, snapshot) {
+          final messages = snapshot.data ?? const <DeliveryChatMessageModel>[];
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Text('Chat de domicilio', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: messages.isEmpty
+                      ? const Center(child: Text('Sin mensajes todavía'))
+                      : ListView.builder(
+                          itemCount: messages.length,
+                          itemBuilder: (_, i) {
+                            final m = messages[i];
+                            return ListTile(
+                              dense: true,
+                              title: Text(m.senderName),
+                              subtitle: Text(m.message),
+                            );
+                          },
+                        ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _messageCtrl,
+                        decoration: const InputDecoration(hintText: 'Escribe un mensaje'),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _sending ? null : _send,
+                      icon: const Icon(Icons.send),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

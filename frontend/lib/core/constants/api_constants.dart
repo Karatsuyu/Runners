@@ -54,6 +54,9 @@ class ApiConstants {
   static const String createDeliveryRequest = '/deliveries/requests/create/';
   static String deliveryRequestDetail(int id) => '/deliveries/requests/$id/';
   static String assignDelivery(int id) => '/deliveries/requests/$id/assign/';
+  static String approveDelivery(int id) => '/deliveries/requests/$id/approve/';
+  static String completeDelivery(int id) => '/deliveries/requests/$id/complete/';
+  static String deliveryChat(int id) => '/deliveries/requests/$id/chat/';
   static String completeDelivery(int id) =>
       '/deliveries/requests/$id/complete/';
   static const String financialRecords = '/deliveries/records/';

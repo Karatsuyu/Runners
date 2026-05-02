@@ -25,6 +25,8 @@ class HiveCacheService {
 
   static const String _commercesBox = 'commerces_cache';
   static const String _commercesKey = 'commerces_list';
+  static const String _settingsBox = 'settings_cache';
+  static const String _themeModeKey = 'theme_mode';
 
   /// Duración máxima del caché antes de considerarse expirado.
   static const Duration _cacheExpiry = Duration(hours: 6);
@@ -38,6 +40,7 @@ class HiveCacheService {
       Hive.openBox<String>(_contactsBox),
       Hive.openBox<String>(_categoriesBox),
       Hive.openBox<String>(_commercesBox),
+      Hive.openBox<String>(_settingsBox),
     ]);
   }
 
@@ -105,6 +108,18 @@ class HiveCacheService {
     return decoded.cast<Map<String, dynamic>>();
   }
 
+  // ── Ajustes ────────────────────────────────────────────────────────────────
+
+  Future<void> saveThemeMode(String mode) async {
+    final box = Hive.box<String>(_settingsBox);
+    await box.put(_themeModeKey, mode);
+  }
+
+  String getThemeMode() {
+    final box = Hive.box<String>(_settingsBox);
+    return box.get(_themeModeKey) ?? 'light';
+  }
+
   // ── Utilidades ────────────────────────────────────────────────────────────
 
   bool _isExpired(String boxName) {
@@ -126,6 +141,7 @@ class HiveCacheService {
       Hive.box<String>(_contactsBox).clear(),
       Hive.box<String>(_categoriesBox).clear(),
       Hive.box<String>(_commercesBox).clear(),
+      Hive.box<String>(_settingsBox).clear(),
     ]);
   }
 
