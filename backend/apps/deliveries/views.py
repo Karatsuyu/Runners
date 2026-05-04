@@ -9,6 +9,9 @@ from .models import (
     FinancialRecord,
     SystemConfig,
     DeliveryChatMessage,
+    DeliveryZone,
+    DeliveryPricingRule,
+    DeliveryCommerceHistory,
 )
 from apps.users.permissions import IsAdmin, IsDomiciliario
 from apps.users.models import User
@@ -219,6 +222,41 @@ class DeliveryChatMessageSerializer(serializers.ModelSerializer):
         model = DeliveryChatMessage
         fields = ['id', 'delivery_request', 'sender', 'sender_name', 'recipient_role', 'message', 'created_at']
         read_only_fields = ['id', 'delivery_request', 'sender', 'sender_name', 'created_at']
+
+
+class DeliveryZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryZone
+        fields = ['id', 'name', 'description', 'is_active']
+        read_only_fields = ['id']
+
+
+class DeliveryPricingRuleSerializer(serializers.ModelSerializer):
+    zone_name = serializers.CharField(source='zone.name', read_only=True)
+
+    class Meta:
+        model = DeliveryPricingRule
+        fields = [
+            'id', 'name', 'request_kind', 'zone', 'zone_name',
+            'min_items', 'max_items', 'min_points', 'max_points',
+            'fee_amount', 'priority', 'is_active'
+        ]
+        read_only_fields = ['id']
+
+
+class DeliveryCommerceHistorySerializer(serializers.ModelSerializer):
+    previous_commerce_name = serializers.CharField(source='previous_commerce.name', read_only=True)
+    new_commerce_name = serializers.CharField(source='new_commerce.name', read_only=True)
+    changed_by_name = serializers.CharField(source='changed_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = DeliveryCommerceHistory
+        fields = [
+            'id', 'delivery_request', 'previous_commerce', 'previous_commerce_name',
+            'new_commerce', 'new_commerce_name', 'changed_by', 'changed_by_name',
+            'notes', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
 
 
 class DelivererListView(generics.ListAPIView):

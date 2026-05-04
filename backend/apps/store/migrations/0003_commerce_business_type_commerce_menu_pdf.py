@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('store', '0002_initial'),
+        ('store', '0002_commerce_menu_pdf'),
     ]
 
     operations = [
@@ -14,10 +14,5 @@ class Migration(migrations.Migration):
             model_name='commerce',
             name='business_type',
             field=models.CharField(choices=[('RESTAURANTE', 'Restaurante'), ('TIENDA', 'Tienda'), ('FARMACIA', 'Farmacia'), ('SUPERMERCADO', 'Supermercado'), ('OTRO', 'Otro')], default='OTRO', max_length=20),
-        ),
-        migrations.AddField(
-            model_name='commerce',
-            name='menu_pdf',
-            field=models.FileField(blank=True, null=True, upload_to='store/commerces/menus/'),
         ),
     ]

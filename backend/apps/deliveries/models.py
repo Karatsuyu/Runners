@@ -101,6 +101,16 @@ class DeliveryRequest(models.Model):
         AUTORIZADO = 'AUTORIZADO', 'Autorizado'
         RECHAZADO = 'RECHAZADO', 'Rechazado'
 
+    class SourceType(models.TextChoices):
+        GENERAL = 'GENERAL', 'General'
+        STORE = 'STORE', 'Desde Tienda'
+
+    class RequestKind(models.TextChoices):
+        RECOGER_ENTREGAR = 'RECOGER_ENTREGAR', 'Recoger y Entregar'
+        COMPRA_SENCILLA = 'COMPRA_SENCILLA', 'Compra Sencilla'
+        SUPERMERCADO = 'SUPERMERCADO', 'Supermercado'
+        MULTIPUNTO = 'MULTIPUNTO', 'Multipunto'
+
     client = models.ForeignKey(User, on_delete=models.PROTECT, related_name='delivery_requests')
     order = models.ForeignKey(
         'store.Order',
