@@ -11,9 +11,24 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Commerce)
 class CommerceAdmin(admin.ModelAdmin):
-    list_display = ['name', 'category', 'business_type', 'phone', 'menu_pdf', 'is_active', 'created_at']
-    list_filter = ['category', 'business_type', 'is_active']
+    list_display = ['name', 'category', 'phone', 'menu_pdf_display', 'is_active', 'created_at']
+    list_filter = ['category', 'is_active']
     search_fields = ['name', 'description']
+    fieldsets = (
+        ('Información General', {
+            'fields': ('name', 'category', 'description', 'phone', 'address', 'is_active')
+        }),
+        ('Medios', {
+            'fields': ('image', 'menu_pdf')
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+    def menu_pdf_display(self, obj):
+        if obj.menu_pdf:
+            return '✓ PDF'
+        return '-'
+    menu_pdf_display.short_description = 'Menú PDF'
 
 
 @admin.register(Product)

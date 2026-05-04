@@ -9,6 +9,10 @@ urlpatterns = [
     # Comercios
     path('commerces/', views.CommerceListView.as_view(), name='commerce_list'),
     path('commerces/<int:pk>/', views.CommerceDetailView.as_view(), name='commerce_detail'),
+    # Comercios - Admin (acceso total)
+    path('admin/commerces/', views.CommerceAdminListView.as_view(), name='commerce_admin_list'),
+    path('admin/commerces/<int:pk>/', views.CommerceAdminDetailView.as_view(), name='commerce_admin_detail'),
+
 
     # Productos (anidados por comercio)
     path('commerces/<int:commerce_pk>/products/', views.ProductListView.as_view(), name='product_list'),

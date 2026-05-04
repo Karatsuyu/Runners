@@ -160,6 +160,23 @@ class Command(BaseCommand):
                 defaults={'description': desc, 'price': price, 'is_available': True},
             )
 
+        menu_files = {
+            'La esquina de Urrea': 'CARTA LA ESQUINA DE URREA.jpg',
+            'La Casa del Chorizo': 'CARTA LA CASA DEL CHORIZO.jpg',
+            'Olala': 'CARTA OLALA.pdf',
+            'Madeiros': 'CARTA MADEIROS.pdf',
+            'Bliss': 'CARTA BLISS.pdf',
+        }
+
+        for commerce_name, menu_file in menu_files.items():
+            Commerce.objects.update_or_create(
+                name=commerce_name,
+                defaults={
+                    'category': cat_rest,
+                    'menu_pdf': f'store/menus/{menu_file}',
+                },
+            )
+
     # ── Servicios ─────────────────────────────────────────────────────────────
 
     def _seed_services(self):

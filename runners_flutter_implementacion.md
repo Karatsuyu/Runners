@@ -2314,65 +2314,84 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/cart_item_entity.dart';
 
-class CartNotifier extends StateNotifier<List<CartItem>> {
-  CartNotifier() : super([]);
+class CartState {
+  final List<CartItem> items;
+  final double deliveryFee;
+
+  CartState({
+    this.items = const [],
+    this.deliveryFee = 0.0,
+  });
+
+  double get subtotal => items.fold(0, (sum, item) => sum + item.subtotal);
+  double get total => subtotal + deliveryFee;
+
+  CartState copyWith({List<CartItem>? items, double? deliveryFee}) {
+    return CartState(
+      items: items ?? this.items,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+    );
+  }
+}
+
+class CartNotifier extends StateNotifier<CartState> {
+  CartNotifier() : super(CartState());
 
   int? _commerceId;
 
-  void addItem(CartItem item, int commerceId) {
+  void addItem(CartItem item, int commerceId, double deliveryFee) {
     // Si hay ítems de otro comercio, preguntar antes (manejado en la UI)
     if (_commerceId != null && _commerceId != commerceId) {
       clearCart();
     }
     _commerceId = commerceId;
 
-    final existing = state.firstWhere(
+    final existing = state.items.firstWhere(
       (i) => i.productId == item.productId,
       orElse: () => const CartItem(
           productId: -1, productName: '', unitPrice: 0, quantity: 0),
     );
 
     if (existing.productId != -1) {
-      state = state
-          .map((i) => i.productId == item.productId
-              ? i.copyWith(quantity: i.quantity + 1)
-              : i)
-          .toList();
+      final newItems = state.items.map((i) => i.productId == item.productId
+          ? i.copyWith(quantity: i.quantity + 1)
+          : i).toList();
+      state = state.copyWith(items: newItems, deliveryFee: deliveryFee);
     } else {
-      state = [...state, item];
+      state = state.copyWith(items: [...state.items, item], deliveryFee: deliveryFee);
     }
   }
 
   void removeItem(int productId) {
-    state = state.where((i) => i.productId != productId).toList();
-    if (state.isEmpty) _commerceId = null;
+    final newItems = state.items.where((i) => i.productId != productId).toList();
+    state = state.copyWith(items: newItems);
+    if (newItems.isEmpty) {
+      _commerceId = null;
+      state = state.copyWith(deliveryFee: 0.0);
+    }
   }
 
   void decreaseQuantity(int productId) {
-    state = state
-        .map((i) => i.productId == productId && i.quantity > 1
-            ? i.copyWith(quantity: i.quantity - 1)
-            : i)
-        .toList();
+    final newItems = state.items.map((i) => i.productId == productId && i.quantity > 1
+        ? i.copyWith(quantity: i.quantity - 1)
+        : i).toList();
+    state = state.copyWith(items: newItems);
   }
 
   void clearCart() {
-    state = [];
+    state = CartState();
     _commerceId = null;
   }
 
-  double get total =>
-      state.fold(0, (sum, item) => sum + item.subtotal);
-
   int get itemCount =>
-      state.fold(0, (sum, item) => sum + item.quantity);
+      state.items.fold(0, (sum, item) => sum + item.quantity);
 
   int? get currentCommerceId => _commerceId;
 
   Map<String, dynamic> toOrderPayload() {
     return {
       'commerce_id': _commerceId,
-      'items': state
+      'items': state.items
           .map((item) => {
                 'product': item.productId,
                 'quantity': item.quantity,
@@ -2382,7 +2401,7 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
   }
 }
 
-final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>(
+final cartProvider = StateNotifierProvider<CartNotifier, CartState>(
   (_) => CartNotifier(),
 );
 ```

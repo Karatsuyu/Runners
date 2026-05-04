@@ -1,8 +1,21 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiConstants {
-  static String get baseUrl =>
-      dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8000/api/v1';
+  static String get baseUrl {
+    final defaultUrl = 'http://10.0.2.2:8000/api/v1';
+    final rawBaseUrl =
+        (kIsWeb ? dotenv.env['API_BASE_URL_WEB'] : null) ??
+        dotenv.env['API_BASE_URL'] ??
+        defaultUrl;
+
+    // 10.0.2.2 is only valid inside Android emulator.
+    if (kIsWeb && rawBaseUrl.contains('10.0.2.2')) {
+      return rawBaseUrl.replaceFirst('10.0.2.2', 'localhost');
+    }
+
+    return rawBaseUrl;
+  }
 
   // Auth
   static const String register = '/auth/register/';
@@ -10,8 +23,11 @@ class ApiConstants {
   static const String tokenRefresh = '/auth/token/refresh/';
   static const String logout = '/auth/logout/';
   static const String profile = '/auth/profile/';
+  static const String passwordResetRequest = '/auth/password-reset/request/';
+  static const String passwordResetConfirm = '/auth/password-reset/confirm/';
   static const String users = '/auth/users/';
   static String toggleUserStatus(int id) => '/auth/users/$id/toggle-status/';
+  static String toggleDelivererStatus(int id) => '/deliveries/deliverers/$id/toggle-status/';
 
   // Store
   static const String categories = '/store/categories/';
@@ -38,13 +54,18 @@ class ApiConstants {
   static const String createDeliveryRequest = '/deliveries/requests/create/';
   static String deliveryRequestDetail(int id) => '/deliveries/requests/$id/';
   static String assignDelivery(int id) => '/deliveries/requests/$id/assign/';
+  static String approveDelivery(int id) => '/deliveries/requests/$id/approve/';
   static String completeDelivery(int id) => '/deliveries/requests/$id/complete/';
+  static String deliveryChat(int id) => '/deliveries/requests/$id/chat/';
+  static String completeDelivery(int id) =>
+      '/deliveries/requests/$id/complete/';
   static const String financialRecords = '/deliveries/records/';
   static const String myDeliveries = '/deliveries/requests/my-deliveries/';
 
   // Contacts (solo directorio, sin disponibilidad)
   static const String contacts = '/contacts/';
   static String contactDetail(int id) => '/contacts/$id/';
+  static String contactReview(int id) => '/contacts/$id/review/';
 
   // Provider profile
   static String providerDetail(int id) => '/services/providers/$id/';
@@ -61,6 +82,7 @@ class ApiConstants {
 
   // Admin
   static const String manageProviders = '/services/providers/admin/';
-  static const String manageCommerces = '/store/commerces/admin/';
+  static const String manageCommerces = '/store/admin/commerces/';
+  static const String manageDeliverers = '/deliveries/admin/deliverers/';
   static const String manageProducts = '/store/products/admin/';
 }

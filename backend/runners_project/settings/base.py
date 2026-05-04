@@ -8,7 +8,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production')
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost').split(',')
+_allowed_hosts_env = os.getenv('ALLOWED_HOSTS')
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in (
+        _allowed_hosts_env.split(',')
+        if _allowed_hosts_env
+        else ['localhost', '127.0.0.1', '[::1]', '10.0.2.2']
+    )
+    if host.strip()
+]
 
 # Aplicaciones instaladas
 DJANGO_APPS = [
@@ -111,6 +120,10 @@ else:
         'CORS_ALLOWED_ORIGINS',
         'http://localhost:5173,http://10.0.2.2:8000,http://127.0.0.1:8000'
     ).split(',')
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r'^http://localhost(:\d+)?$',
+    r'^http://127\.0\.0\.1(:\d+)?$',
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -138,3 +151,19 @@ LANGUAGE_CODE = 'es-co'
 TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
+
+# Correo (recuperacion de contrasena)
+_email_backend_env = os.getenv('EMAIL_BACKEND')
+_has_smtp_creds = bool(os.getenv('EMAIL_HOST_USER') and os.getenv('EMAIL_HOST_PASSWORD'))
+EMAIL_BACKEND = _email_backend_env or (
+    'django.core.mail.backends.smtp.EmailBackend'
+    if _has_smtp_creds
+    else 'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'no-reply@runners.local')
+APP_NAME = os.getenv('APP_NAME', 'Runners')

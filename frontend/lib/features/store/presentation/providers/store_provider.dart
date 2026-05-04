@@ -10,17 +10,18 @@ class CategoryModel {
   final String name;
   final String description;
   final bool isActive;
-  CategoryModel(
-      {required this.id,
-      required this.name,
-      required this.description,
-      required this.isActive});
+  CategoryModel({
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.isActive,
+  });
   factory CategoryModel.fromJson(Map<String, dynamic> j) => CategoryModel(
-        id: j['id'] as int,
-        name: j['name'] as String? ?? '',
-        description: j['description'] as String? ?? '',
-        isActive: j['is_active'] as bool? ?? true,
-      );
+    id: j['id'] as int,
+    name: j['name'] as String? ?? '',
+    description: j['description'] as String? ?? '',
+    isActive: j['is_active'] as bool? ?? true,
+  );
 }
 
 class ProductModel {
@@ -31,23 +32,24 @@ class ProductModel {
   final double price;
   final String? image;
   final bool isAvailable;
-  ProductModel(
-      {required this.id,
-      required this.commerce,
-      required this.name,
-      required this.description,
-      required this.price,
-      this.image,
-      required this.isAvailable});
+  ProductModel({
+    required this.id,
+    required this.commerce,
+    required this.name,
+    required this.description,
+    required this.price,
+    this.image,
+    required this.isAvailable,
+  });
   factory ProductModel.fromJson(Map<String, dynamic> j) => ProductModel(
-        id: j['id'] as int,
-        commerce: j['commerce'] as int? ?? 0,
-        name: j['name'] as String? ?? '',
-        description: j['description'] as String? ?? '',
-        price: (j['price'] as num?)?.toDouble() ?? 0.0,
-        image: j['image'] as String?,
-        isAvailable: j['is_available'] as bool? ?? true,
-      );
+    id: j['id'] as int,
+    commerce: j['commerce'] as int? ?? 0,
+    name: j['name'] as String? ?? '',
+    description: j['description'] as String? ?? '',
+    price: (j['price'] as num?)?.toDouble() ?? 0.0,
+    image: j['image'] as String?,
+    isAvailable: j['is_available'] as bool? ?? true,
+  );
 }
 
 class CommerceModel {
@@ -57,27 +59,34 @@ class CommerceModel {
   final String name;
   final String description;
   final String phone;
+  final String address;
   final String? image;
+  final String? menuPdf;
   final bool isActive;
-  CommerceModel(
-      {required this.id,
-      required this.categoryId,
-      required this.categoryName,
-      required this.name,
-      required this.description,
-      required this.phone,
-      this.image,
-      required this.isActive});
+  CommerceModel({
+    required this.id,
+    required this.categoryId,
+    required this.categoryName,
+    required this.name,
+    required this.description,
+    required this.phone,
+    required this.address,
+    this.image,
+    this.menuPdf,
+    required this.isActive,
+  });
   factory CommerceModel.fromJson(Map<String, dynamic> j) => CommerceModel(
-        id: j['id'] as int,
-        categoryId: j['category'] as int? ?? 0,
-        categoryName: j['category_name'] as String? ?? '',
-        name: j['name'] as String? ?? '',
-        description: j['description'] as String? ?? '',
-        phone: j['phone'] as String? ?? '',
-        image: j['image'] as String?,
-        isActive: j['is_active'] as bool? ?? true,
-      );
+    id: j['id'] as int,
+    categoryId: j['category'] as int? ?? 0,
+    categoryName: j['category_name'] as String? ?? '',
+    name: j['name'] as String? ?? '',
+    description: j['description'] as String? ?? '',
+    phone: j['phone'] as String? ?? '',
+    address: j['address'] as String? ?? '',
+    image: j['image'] as String?,
+    menuPdf: j['menu_pdf'] as String?,
+    isActive: j['is_active'] as bool? ?? true,
+  );
 }
 
 class OrderItemInput {
@@ -85,11 +94,12 @@ class OrderItemInput {
   final String productName;
   final double unitPrice;
   int quantity;
-  OrderItemInput(
-      {required this.productId,
-      required this.productName,
-      required this.unitPrice,
-      required this.quantity});
+  OrderItemInput({
+    required this.productId,
+    required this.productName,
+    required this.unitPrice,
+    required this.quantity,
+  });
   double get subtotal => unitPrice * quantity;
 }
 
@@ -101,23 +111,24 @@ class OrderModel {
   final double total;
   final String notes;
   final String createdAt;
-  OrderModel(
-      {required this.id,
-      required this.clientName,
-      required this.commerceName,
-      required this.status,
-      required this.total,
-      required this.notes,
-      required this.createdAt});
+  OrderModel({
+    required this.id,
+    required this.clientName,
+    required this.commerceName,
+    required this.status,
+    required this.total,
+    required this.notes,
+    required this.createdAt,
+  });
   factory OrderModel.fromJson(Map<String, dynamic> j) => OrderModel(
-        id: j['id'] as int,
-        clientName: j['client_name'] as String? ?? '',
-        commerceName: j['commerce_name'] as String? ?? '',
-        status: j['status'] as String? ?? 'PENDIENTE',
-        total: (j['total'] as num?)?.toDouble() ?? 0.0,
-        notes: j['notes'] as String? ?? '',
-        createdAt: j['created_at'] as String? ?? '',
-      );
+    id: j['id'] as int,
+    clientName: j['client_name'] as String? ?? '',
+    commerceName: j['commerce_name'] as String? ?? '',
+    status: j['status'] as String? ?? 'PENDIENTE',
+    total: (j['total'] as num?)?.toDouble() ?? 0.0,
+    notes: j['notes'] as String? ?? '',
+    createdAt: j['created_at'] as String? ?? '',
+  );
   Color get statusColor {
     switch (status) {
       case 'CONFIRMADO':
@@ -151,8 +162,7 @@ class StoreDataSource {
   Future<List<CommerceModel>> getCommerces({int? categoryId}) async {
     final r = await _dio.get(
       '/store/commerces/',
-      queryParameters:
-          categoryId != null ? {'category': categoryId} : null,
+      queryParameters: categoryId != null ? {'category': categoryId} : null,
     );
     final list =
         (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
@@ -202,24 +212,32 @@ final commercesProvider = FutureProvider<List<CommerceModel>>((ref) {
   return ref.read(storeDataSourceProvider).getCommerces(categoryId: categoryId);
 });
 
-final commerceDetailProvider =
-    FutureProvider.family<CommerceModel, int>((ref, id) async {
+final commerceDetailProvider = FutureProvider.family<CommerceModel, int>((
+  ref,
+  id,
+) async {
   final commerces = await ref.watch(commercesProvider.future);
-  return commerces.firstWhere((c) => c.id == id,
-      orElse: () => CommerceModel(
-          id: id,
-          categoryId: 0,
-          categoryName: '',
-          name: '',
-          description: '',
-          phone: '',
-          isActive: true));
+  return commerces.firstWhere(
+    (c) => c.id == id,
+    orElse: () => CommerceModel(
+      id: id,
+      categoryId: 0,
+      categoryName: '',
+      name: '',
+      description: '',
+      phone: '',
+      address: '',
+      menuPdf: null,
+      isActive: true,
+    ),
+  );
 });
 
-final commerceProductsProvider =
-    FutureProvider.family<List<ProductModel>, int>((ref, commerceId) {
-  return ref.read(storeDataSourceProvider).getProducts(commerceId);
-});
+final commerceProductsProvider = FutureProvider.family<List<ProductModel>, int>(
+  (ref, commerceId) {
+    return ref.read(storeDataSourceProvider).getProducts(commerceId);
+  },
+);
 
 final ordersProvider = FutureProvider<List<OrderModel>>((ref) {
   return ref.read(storeDataSourceProvider).getOrders();
@@ -247,7 +265,7 @@ class CartNotifier extends StateNotifier<List<OrderItemInput>> {
               quantity: state[i].quantity + 1,
             )
           else
-            state[i]
+            state[i],
       ];
     } else {
       state = [...state, item];
@@ -272,7 +290,7 @@ class CartNotifier extends StateNotifier<List<OrderItemInput>> {
         else if (item.productId == productId && item.quantity == 1)
           item
         else
-          item
+          item,
     ].where((i) => i.quantity > 0).toList();
   }
 
@@ -286,13 +304,13 @@ class CartNotifier extends StateNotifier<List<OrderItemInput>> {
   int? get currentCommerceId => _commerceId;
 
   Map<String, dynamic> toOrderPayload() => {
-        'commerce_id': _commerceId,
-        'items': state
-            .map((i) => {'product': i.productId, 'quantity': i.quantity})
-            .toList(),
-      };
+    'commerce_id': _commerceId,
+    'items': state
+        .map((i) => {'product': i.productId, 'quantity': i.quantity})
+        .toList(),
+  };
 }
 
-final cartProvider =
-    StateNotifierProvider<CartNotifier, List<OrderItemInput>>(
-        (_) => CartNotifier());
+final cartProvider = StateNotifierProvider<CartNotifier, List<OrderItemInput>>(
+  (_) => CartNotifier(),
+);

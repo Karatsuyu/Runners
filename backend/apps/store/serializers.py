@@ -26,12 +26,8 @@ class CommerceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Commerce
-        fields = [
-            'id', 'category', 'category_name', 'name', 'business_type',
-            'description', 'phone', 'address', 'image', 'menu_pdf',
-            'is_active', 'products_count'
-        ]
-        read_only_fields = ['id']
+        fields = ['id', 'category', 'category_name', 'name', 'description', 'phone', 'address', 'image', 'menu_pdf', 'is_active', 'products_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'products_count', 'category_name']
 
     def get_products_count(self, obj):
         return obj.products.filter(is_available=True).count()
@@ -66,8 +62,12 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'client', 'client_name', 'commerce', 'commerce_name', 'status', 'total', 'notes', 'via_runners', 'items', 'created_at']
-        read_only_fields = ['id', 'client', 'total', 'via_runners', 'created_at']
+        fields = [
+            'id', 'client', 'client_name', 'commerce', 'commerce_name',
+            'status', 'products_subtotal', 'delivery_total', 'total',
+            'notes', 'via_runners', 'items', 'created_at'
+        ]
+        read_only_fields = ['id', 'client', 'products_subtotal', 'delivery_total', 'total', 'via_runners', 'created_at']
 
 
 class OrderCreateSerializer(serializers.Serializer):

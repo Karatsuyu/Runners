@@ -28,3 +28,44 @@ class GetProfileUseCase {
   GetProfileUseCase(this._repository);
   Future<Either<Failure, UserEntity>> call() => _repository.getProfile();
 }
+
+class UpdateProfileUseCase {
+  final AuthRepository _repository;
+  UpdateProfileUseCase(this._repository);
+  Future<Either<Failure, UserEntity>> call({
+    required String firstName,
+    required String lastName,
+    String? phone,
+    String? username,
+    String? profileImagePath,
+  }) => _repository.updateProfile(
+    firstName: firstName,
+    lastName: lastName,
+    phone: phone,
+    username: username,
+    profileImagePath: profileImagePath,
+  );
+}
+
+class RequestPasswordResetCodeUseCase {
+  final AuthRepository _repository;
+  RequestPasswordResetCodeUseCase(this._repository);
+  Future<Either<Failure, void>> call(String email) =>
+      _repository.requestPasswordResetCode(email);
+}
+
+class ConfirmPasswordResetUseCase {
+  final AuthRepository _repository;
+  ConfirmPasswordResetUseCase(this._repository);
+  Future<Either<Failure, void>> call({
+    required String email,
+    required String code,
+    required String newPassword,
+    required String newPassword2,
+  }) => _repository.confirmPasswordReset(
+    email: email,
+    code: code,
+    newPassword: newPassword,
+    newPassword2: newPassword2,
+  );
+}

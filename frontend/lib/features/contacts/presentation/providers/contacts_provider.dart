@@ -13,6 +13,10 @@ class ContactModel {
   final String? email;
   final String type; // emergency, professional, commerce
   final String? description;
+  final String? imageUrl;
+  final int? ownerId;
+  final String approvalStatus;
+  final String? rejectionReason;
 
   const ContactModel({
     required this.id,
@@ -21,6 +25,10 @@ class ContactModel {
     this.email,
     required this.type,
     this.description,
+    this.imageUrl,
+    this.ownerId,
+    this.approvalStatus = 'APROBADO',
+    this.rejectionReason,
   });
 
   factory ContactModel.fromJson(Map<String, dynamic> j) => ContactModel(
@@ -28,8 +36,13 @@ class ContactModel {
         name: j['name'] as String? ?? '',
         phone: j['phone'] as String? ?? '',
         email: j['email'] as String?,
-        type: j['type'] as String? ?? 'professional',
+        type: j['type'] as String? ??
+            _typeFromBackend(j['contact_type'] as String?),
         description: j['description'] as String?,
+        imageUrl: j['image_url'] as String? ?? j['imageUrl'] as String?,
+        ownerId: j['owner_id'] as int?,
+        approvalStatus: j['approval_status'] as String? ?? 'APROBADO',
+        rejectionReason: j['rejection_reason'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -38,7 +51,22 @@ class ContactModel {
         if (email != null) 'email': email,
         'type': type,
         if (description != null) 'description': description,
+        if (imageUrl != null && imageUrl!.isNotEmpty) 'image_url': imageUrl,
       };
+
+  bool get isApproved => approvalStatus == 'APROBADO';
+
+  static String _typeFromBackend(String? raw) {
+    switch (raw) {
+      case 'EMERGENCIA':
+        return 'emergency';
+      case 'COMERCIO':
+        return 'commerce';
+      case 'PROFESIONAL':
+      default:
+        return 'professional';
+    }
+  }
 
   String get typeLabel {
     switch (type) {
@@ -76,20 +104,64 @@ class ContactsDataSource {
         .toList();
   }
 
-  Future<ContactModel> createContact(ContactModel contact) async {
-    final res =
-        await _dio.post(ApiConstants.contacts, data: contact.toJson());
+  Future<ContactModel> createContact(
+    ContactModel contact, {
+    String? imagePath,
+  }) async {
+    final payload = FormData.fromMap({
+      ...contact.toJson(),
+      if (imagePath != null && imagePath.isNotEmpty)
+        'image': await MultipartFile.fromFile(imagePath),
+    });
+    final res = await _dio.post(ApiConstants.contacts, data: payload);
     return ContactModel.fromJson(res.data as Map<String, dynamic>);
   }
 
-  Future<ContactModel> updateContact(int id, ContactModel contact) async {
-    final res = await _dio.put(
-        ApiConstants.contactDetail(id), data: contact.toJson());
+  Future<ContactModel> updateContact(
+    int id,
+    ContactModel contact, {
+    String? imagePath,
+  }) async {
+    final payload = FormData.fromMap({
+      ...contact.toJson(),
+      if (imagePath != null && imagePath.isNotEmpty)
+        'image': await MultipartFile.fromFile(imagePath),
+    });
+    final res = await _dio.put(ApiConstants.contactDetail(id), data: payload);
     return ContactModel.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<void> deleteContact(int id) async {
     await _dio.delete(ApiConstants.contactDetail(id));
+  }
+
+  Future<ContactModel> reviewContact({
+    required int id,
+    required bool approve,
+    String? reason,
+  }) async {
+    final res = await _dio.post(
+      ApiConstants.contactReview(id),
+      data: {
+        'action': approve ? 'approve' : 'reject',
+        if (!approve && reason != null && reason.isNotEmpty) 'reason': reason,
+      },
+    );
+    return ContactModel.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<ContactModel> updateMyContact({
+    required int id,
+    required String phone,
+    String? imagePath,
+  }) async {
+    final payload = FormData.fromMap({
+      'phone': phone,
+      if (imagePath != null && imagePath.isNotEmpty)
+        'image': await MultipartFile.fromFile(imagePath),
+    });
+    final res = await _dio.put(ApiConstants.contactDetail(id), data: payload);
+    return ContactModel.fromJson(res.data as Map<String, dynamic>);
   }
 }
 
@@ -137,3 +209,43 @@ final contactsProvider = FutureProvider<List<ContactModel>>((ref) async {
     rethrow;
   }
 });
+
+final contactsActionsProvider = Provider<ContactsActions>((ref) {
+  return ContactsActions(ref);
+});
+
+class ContactsActions {
+  final Ref _ref;
+  ContactsActions(this._ref);
+
+  Future<void> addManualContact({
+    required String name,
+    required String phone,
+    String? imageUrl,
+    String? imagePath,
+    String? email,
+    String type = 'professional',
+    String? description,
+  }) async {
+    final ds = _ref.read(contactsDataSourceProvider);
+    final newContact = ContactModel(
+      id: 0,
+      name: name,
+      phone: phone,
+      email: email,
+      type: type,
+      description: description,
+      imageUrl: imageUrl,
+    );
+    await ds.createContact(newContact, imagePath: imagePath);
+  }
+
+  Future<void> updateOwnContact({
+    required int contactId,
+    required String phone,
+    String? imagePath,
+  }) async {
+    final ds = _ref.read(contactsDataSourceProvider);
+    await ds.updateMyContact(id: contactId, phone: phone, imagePath: imagePath);
+  }
+}

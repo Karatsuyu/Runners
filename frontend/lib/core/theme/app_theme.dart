@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_colors.dart';
 
 class AppTheme {
   static ThemeData get lightTheme => ThemeData(
         useMaterial3: true,
+        textTheme: GoogleFonts.interTextTheme(),
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primaryGreen,
           primary: AppColors.primaryGreen,

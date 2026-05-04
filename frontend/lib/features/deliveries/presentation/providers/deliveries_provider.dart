@@ -66,6 +66,10 @@ class DeliveryRequestModel {
   final String deliveryAddress;
   final String description;
   final String status; // pending, assigned, in_progress, completed, cancelled
+  final String approvalStatus;
+  final double? adminDeliveryFee;
+  final bool isDelivered;
+  final bool isPaid;
   final double? income;
   final double? expenses;
   final String createdAt;
@@ -79,26 +83,54 @@ class DeliveryRequestModel {
     required this.deliveryAddress,
     required this.description,
     required this.status,
+    required this.approvalStatus,
+    this.adminDeliveryFee,
+    required this.isDelivered,
+    required this.isPaid,
     this.income,
     this.expenses,
     required this.createdAt,
     this.completedAt,
   });
 
-  factory DeliveryRequestModel.fromJson(Map<String, dynamic> j) =>
-      DeliveryRequestModel(
+  factory DeliveryRequestModel.fromJson(Map<String, dynamic> j) {
+    final rawStatus = (j['status'] as String? ?? 'SOLICITADO').toUpperCase();
+    String normalizedStatus;
+    switch (rawStatus) {
+      case 'ACEPTADO':
+        normalizedStatus = 'assigned';
+        break;
+      case 'EN_CAMINO':
+        normalizedStatus = 'in_progress';
+        break;
+      case 'ENTREGADO':
+        normalizedStatus = 'completed';
+        break;
+      case 'CANCELADO':
+        normalizedStatus = 'cancelled';
+        break;
+      default:
+        normalizedStatus = 'pending';
+    }
+
+    return DeliveryRequestModel(
         id: j['id'] as int,
         clientName: j['client_name'] as String? ?? '',
         delivererName: j['deliverer_name'] as String?,
         pickupAddress: j['pickup_address'] as String? ?? '',
         deliveryAddress: j['delivery_address'] as String? ?? '',
         description: j['description'] as String? ?? '',
-        status: j['status'] as String? ?? 'pending',
+        status: normalizedStatus,
+        approvalStatus: j['approval_status'] as String? ?? 'PENDIENTE',
+        adminDeliveryFee: (j['admin_delivery_fee'] as num?)?.toDouble(),
+        isDelivered: j['is_delivered'] as bool? ?? false,
+        isPaid: j['is_paid'] as bool? ?? false,
         income: (j['income'] as num?)?.toDouble(),
         expenses: (j['expenses'] as num?)?.toDouble(),
         createdAt: j['created_at'] as String? ?? '',
         completedAt: j['completed_at'] as String?,
       );
+  }
 
   String get statusLabel {
     switch (status) {
@@ -116,6 +148,31 @@ class DeliveryRequestModel {
         return status;
     }
   }
+}
+
+class DeliveryChatMessageModel {
+  final int id;
+  final String senderName;
+  final String recipientRole;
+  final String message;
+  final String createdAt;
+
+  const DeliveryChatMessageModel({
+    required this.id,
+    required this.senderName,
+    required this.recipientRole,
+    required this.message,
+    required this.createdAt,
+  });
+
+  factory DeliveryChatMessageModel.fromJson(Map<String, dynamic> j) =>
+      DeliveryChatMessageModel(
+        id: j['id'] as int,
+        senderName: j['sender_name'] as String? ?? '',
+        recipientRole: j['recipient_role'] as String? ?? '',
+        message: j['message'] as String? ?? '',
+        createdAt: j['created_at'] as String? ?? '',
+      );
 }
 
 class FinancialRecordModel {
@@ -187,9 +244,47 @@ class DeliveriesDataSource {
         .toList();
   }
 
-  /// DELIVERER: mark delivery as completed
-  Future<void> completeDelivery(int id) async {
-    await _dio.post(ApiConstants.completeDelivery(id));
+  /// ADMIN: approve request and set fee
+  Future<DeliveryRequestModel> approveDelivery({
+    required int id,
+    required double fee,
+    bool approved = true,
+  }) async {
+    final res = await _dio.patch(
+      ApiConstants.approveDelivery(id),
+      data: {'admin_delivery_fee': fee, 'approved': approved},
+    );
+    return DeliveryRequestModel.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// DELIVERER: update delivery status (delivered/paid)
+  Future<void> completeDelivery(int id, {bool? isDelivered, bool? isPaid}) async {
+    await _dio.post(
+      ApiConstants.completeDelivery(id),
+      data: {
+        if (isDelivered != null) 'is_delivered': isDelivered,
+        if (isPaid != null) 'is_paid': isPaid,
+      },
+    );
+  }
+
+  Future<List<DeliveryChatMessageModel>> getDeliveryChat(int id) async {
+    final res = await _dio.get(ApiConstants.deliveryChat(id));
+    final data = res.data is List ? res.data as List : (res.data['results'] as List? ?? []);
+    return data
+        .map((j) => DeliveryChatMessageModel.fromJson(j as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> sendDeliveryChatMessage({
+    required int id,
+    required String message,
+    required String recipientRole,
+  }) async {
+    await _dio.post(
+      ApiConstants.deliveryChat(id),
+      data: {'message': message, 'recipient_role': recipientRole},
+    );
   }
 
   /// DELIVERER: update own availability status

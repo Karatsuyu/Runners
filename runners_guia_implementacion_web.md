@@ -791,67 +791,8 @@ python manage.py runserver
 # Servidor disponible en: http://localhost:8000
 ```
 
-### 4.4 Configuración del Frontend (React + Vite)
 
-```bash
-cd ../frontend
 
-# Instalar dependencias
-npm install
-
-# Variables de entorno
-cp .env.example .env
-```
-
-#### `frontend/.env.example`
-
-```env
-VITE_API_URL=http://localhost:8000/api/v1
-VITE_APP_NAME=Runners
-```
-
-```bash
-# Iniciar servidor de desarrollo
-npm run dev
-# Disponible en: http://localhost:5173
-
-# Build para producción
-npm run build
-
-# Preview del build
-npm run preview
-```
-
-#### `frontend/package.json` (dependencias clave)
-
-```json
-{
-  "name": "runners-frontend",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "lint": "eslint ."
-  },
-  "dependencies": {
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.4",
-    "axios": "^1.12.2"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^5.0.0",
-    "vite": "^7.1.0",
-    "eslint": "^9.33.0",
-    "@eslint/js": "^9.33.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20"
-  }
-}
-```
-
----
 
 ## 5. Base de Datos — Modelos Django
 

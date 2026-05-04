@@ -40,7 +40,7 @@ class DioClient {
               final response = await _dio.fetch(error.requestOptions);
               return handler.resolve(response);
             } else {
-              await _storage.clearAll();
+              await _storage.clearSession();
             }
           }
           return handler.next(error);

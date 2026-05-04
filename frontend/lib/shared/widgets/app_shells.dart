@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/router/app_routes.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/theme/theme_mode_provider.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 
 class _NavTab {
@@ -13,17 +14,16 @@ class _NavTab {
 }
 
 // ── Shell del Cliente ──────────────────────────────────────────────────────
-class ClientShell extends StatelessWidget {
+class ClientShell extends ConsumerWidget {
   final Widget child;
   const ClientShell({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
     final tabs = [
-      _NavTab(AppRoutes.store, Icons.store_rounded, 'Tienda'),
-      _NavTab(AppRoutes.services, Icons.handyman_rounded, 'Servicios'),
       _NavTab(AppRoutes.deliveries, Icons.delivery_dining_rounded, 'Domicilios'),
+      _NavTab(AppRoutes.store, Icons.store_rounded, 'Tienda'),
       _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int currentIndex =
@@ -32,6 +32,29 @@ class ClientShell extends StatelessWidget {
 
     return Scaffold(
       body: child,
+      floatingActionButton: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [BoxShadow(blurRadius: 6, color: Colors.black12)],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              ref.watch(themeModeProvider) == ThemeMode.dark
+                  ? Icons.nightlight_round
+                  : Icons.wb_sunny,
+              size: 18,
+            ),
+            Switch(
+              value: ref.watch(themeModeProvider) == ThemeMode.dark,
+              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
+            ),
+          ],
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (i) => context.go(tabs[i].route),
@@ -56,7 +79,7 @@ class ProviderShell extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final tabs = [
       _NavTab(AppRoutes.providerDashboard, Icons.dashboard_rounded, 'Mi Panel'),
-      _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
+      _NavTab(AppRoutes.providerContacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int idx = tabs.indexWhere((t) => location.startsWith(t.route));
     return Scaffold(
@@ -87,7 +110,7 @@ class DelivererShell extends StatelessWidget {
       _NavTab(AppRoutes.delivererDashboard, Icons.dashboard_rounded, 'Mi Panel'),
       _NavTab(AppRoutes.myDeliveries, Icons.delivery_dining_rounded, 'Mis Domicilios'),
       _NavTab(AppRoutes.financialRecords, Icons.account_balance_wallet_rounded, 'Finanzas'),
-      _NavTab(AppRoutes.contacts, Icons.contacts_rounded, 'Contactos'),
+      _NavTab(AppRoutes.delivererContacts, Icons.contacts_rounded, 'Contactos'),
     ];
     int idx = tabs.indexWhere((t) => location.startsWith(t.route));
     return Scaffold(
@@ -151,7 +174,7 @@ class AdminShell extends ConsumerWidget {
             _DrawerItem(
                 Icons.dashboard_rounded, 'Dashboard', AppRoutes.adminDashboard),
             _DrawerItem(
-                Icons.people_rounded, 'Usuarios', AppRoutes.manageUsers),
+              Icons.delivery_dining_rounded, 'Domiciliarios', AppRoutes.manageUsers),
             _DrawerItem(
                 Icons.handyman_rounded, 'Prestadores', AppRoutes.manageProviders),
             _DrawerItem(
@@ -176,9 +199,10 @@ class _DrawerItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleLabel = label == 'Usuarios' ? 'Domiciliarios' : label;
     return ListTile(
       leading: Icon(icon, color: AppColors.primaryGreen),
-      title: Text(label),
+      title: Text(visibleLabel),
       onTap: () {
         Navigator.pop(context);
         context.go(route);

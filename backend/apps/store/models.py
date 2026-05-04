@@ -34,7 +34,7 @@ class Commerce(models.Model):
     phone = models.CharField(max_length=20, blank=True)
     address = models.CharField(max_length=255, blank=True)
     image = models.ImageField(upload_to='store/commerces/', blank=True, null=True)
-    menu_pdf = models.FileField(upload_to='store/commerces/menus/', blank=True, null=True)
+    menu_pdf = models.FileField(upload_to='store/menus/', blank=True, null=True, help_text='Carta o menú en PDF')
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -81,6 +81,8 @@ class Order(models.Model):
     client = models.ForeignKey(User, on_delete=models.PROTECT, related_name='orders')
     commerce = models.ForeignKey(Commerce, on_delete=models.PROTECT, related_name='orders')
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDIENTE)
+    products_subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    delivery_total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notes = models.TextField(blank=True)
     via_runners = models.BooleanField(default=True)  # Trazabilidad: siempre True si viene de la plataforma
@@ -97,8 +99,9 @@ class Order(models.Model):
         return f'Pedido #{self.id} - {self.client.get_full_name()} → {self.commerce.name}'
 
     def calculate_total(self):
-        self.total = sum(item.subtotal for item in self.items.all())
-        self.save(update_fields=['total'])
+        self.products_subtotal = sum(item.subtotal for item in self.items.all())
+        self.total = self.products_subtotal + self.delivery_total
+        self.save(update_fields=['products_subtotal', 'total'])
 
 
 class OrderItem(models.Model):
