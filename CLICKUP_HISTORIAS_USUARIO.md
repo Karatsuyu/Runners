@@ -211,168 +211,303 @@ Listas para importar directamente como tareas en **ClickUp**. Cada una con 5 a 6
 
 ### HU-11: Carrito de compras (CartNotifier)
 **Descripción:** Como cliente, mantendré en un widget flotador (Notificador Riverpod) el acumulado de items que pretendo ordenar actualizando en tiempo vivo.
-**CA:**
-*   [ ] CA1: Añadir repite o acumula unidades y actualiza contadores.
-*   [ ] CA2: Alertar y obstruir al mezclar Comercio 1 con Comercio 2; "Carrito solo acepta 1 tienda actual".
-*   [ ] CA3: Restaurar cerrado forzado, Riverpod lee Hive de nuevo recuperando progreso.
-*   [ ] CA4: Restar al número máximo 0 extrae y depura al producto de la cadena de objetos Hive.
-*   [ ] CA5: Computa matematicamente el valor real Float total en pantalla final sin errores por redondeo.
-*   [ ] DoD universal cubierto ✅.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Agregar productos incrementa cantidades y actualiza el total.
+*   [ ] CA2: El carrito impide mezclar productos de comercios distintos.
+*   [ ] CA3: Se puede aumentar, disminuir o eliminar productos desde la vista del carrito.
+*   [ ] CA4: El estado del carrito se conserva mientras la sesión esté activa.
+*   [ ] CA5: El total se calcula de forma precisa y visible antes de confirmar.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de carrito y totales realizadas.
+*   [ ] Reglas de negocio del carrito validadas.
+*   [ ] Persistencia temporal o en memoria verificada.
+*   [ ] Manejo de errores y estados vacíos incluido.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-12: Confirmación y creación de pedido
-**Descripción:** Como cliente, haré la rúbrica y envío de los lotes del carrito para convertirlos en tickets del modelo Orders de Backend.
-**CA:**
-*   [ ] CA1: Mandar paquete con array de artículos envía request múltiple al Backend devolviendo estatus In Order Process (201).
-*   [ ] CA2: Tras el retorno exitoso, Flutter ordena matar vaciando el carrito visual y persistente base 0.
-*   [ ] CA3: Intercepta fallos; Si Django declina por desincronización de precio con la data oficial remite "Precio modificado intermitente, Refresque".
-*   [ ] CA4: El POST inyecta la lat/lng o string geográfico proporcionado en un Text form extra "A donde enviar".
-*   [ ] CA5: Redirige pantalla al panel temporal "Compra confirmada: Generado con UUID xxxx".
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como cliente, quiero confirmar mi carrito y crear el pedido en el backend.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El pedido se envía correctamente con los ítems y el total esperado.
+*   [ ] CA2: Al confirmar con éxito, el carrito se vacía.
+*   [ ] CA3: El sistema registra la trazabilidad del pedido en backend.
+*   [ ] CA4: Si hay un error de validación, se informa al usuario sin perder la selección.
+*   [ ] CA5: La app muestra confirmación visual del pedido creado.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de creación de pedido realizadas.
+*   [ ] Persistencia y trazabilidad verificadas.
+*   [ ] Manejo de errores funcional confirmado.
+*   [ ] Integración frontend-backend validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-13: Historial de pedidos del cliente
-**Descripción:** Como cliente, requiero revisar viejas compras retrospectivas visualizando el list status y detalle ordenado viejo a nuevo.
-**CA:**
-*   [ ] CA1: Mapear historial y mostrar Enum states en verde "finalizado" o rojo "Cancelado" ordenado por datetime en UI ListView.
-*   [ ] CA2: Tap simple abrirá las subdivisiones de objetos implicados que poseía este pedido en su línea transaccional originada.
-*   [ ] CA3: Impide filtración JWT, la base a nivel DB filtra query con mi UID personal restringiendo listados ajenos en endpoints API crudos.
-*   [ ] CA4: Ausencia devuelve Placeholder nulo de "Realiza tu compra primera".
-*   [ ] CA5: Refresh indicator implementado para recargas jalando hacia abajo actualizando estados de un pedido "En progreso".
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como cliente, quiero revisar mis pedidos anteriores y su estado.
+**Puntos:** 3 | **Prioridad:** Media
+**Criterios de Aceptación:**
+*   [ ] CA1: El historial lista los pedidos del usuario autenticado.
+*   [ ] CA2: Cada pedido muestra estado, fecha y total.
+*   [ ] CA3: El detalle del pedido permite ver sus ítems asociados.
+*   [ ] CA4: Si no hay pedidos, se muestra un estado vacío claro.
+*   [ ] CA5: La recarga manual actualiza la información del listado.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de historial y detalle realizadas.
+*   [ ] Filtro por usuario autenticado confirmado.
+*   [ ] Estados vacíos y recarga validados.
+*   [ ] Persistencia histórica verificada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ---
 
 ## 🛠️ ÉPICA 04: Servicios Profesionales
 
 ### HU-14: Pantalla Servicios con categorías y prestadores
-**Descripción:** Como prospecto cliente, usaré listas buscando profesionales o plomeros verificados exponiendo solo las variables calificativas y su rubro general.
-**CA:**
-*   [ ] CA1: Devuelve desde Backend a los prestatarios que el flag Is_Approved posean y cumplan la pertenencia True.
-*   [ ] CA2: Agrupados bajo chips de filtros ("Fontanero, Belleza, Tutor").
-*   [ ] CA3: Un search bar con Riverpod provider intercepta filtrando cadenas por coincidencia de strings dentro del objeto visual de los prestatarios.
-*   [ ] CA4: Red responde 403 u vacía en peticiones fuera de un token de client u admin logueados base garantizando resguardo y privacidad de prestadores.
-*   [ ] CA5: Se protegen los rendimientos nulos arrojando fallbacks al fallar red base.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como cliente, quiero buscar prestadores de servicios por categoría y disponibilidad.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla lista categorías de servicios y prestadores disponibles.
+*   [ ] CA2: El filtro por categoría actualiza los prestadores mostrados.
+*   [ ] CA3: Solo se muestran prestadores aprobados y activos.
+*   [ ] CA4: La búsqueda por texto ayuda a encontrar prestadores más rápido.
+*   [ ] CA5: Los errores de red se gestionan con feedback claro.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de listado, búsqueda y filtro realizadas.
+*   [ ] Reglas de aprobación y visibilidad confirmadas.
+*   [ ] Persistencia de servicios y categorías verificada.
+*   [ ] UX y estados de carga validados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-15: Detalle del prestador
-**Descripción:** Como futuro contratista, pulso al ofertante examinando sus datos a gran escala y evaluando calificaciones pasadas o un poco del about descriptivo de la persona.
-**CA:**
-*   [ ] CA1: Consumir URL `provider/{id}` jalando información de sus tablas anexas que llenó la BD biográfica Django devolviendo a vista expandible.
-*   [ ] CA2: Foto renderizada mediante avatar de red y control de fallo (Avatar Letras iniciales de No ser posible una foto).
-*   [ ] CA3: Se renderiza un gran botón flotante de Acción Principal "Solicitar Ayuda De Este Profesional".
-*   [ ] CA4: Impedimento de solicitar si es su misma cuenta quien revisa (Cliente que es prestador no se contrata así mismo).
-*   [ ] CA5: Fallas devuelven red un Modal Not-found alert visual UI "No se ubica prestatario activo".
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como cliente, quiero ver el detalle de un prestador antes de solicitar el servicio.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Se muestra la información principal del prestador y su categoría.
+*   [ ] CA2: La vista incluye imagen o avatar por defecto si no existe foto.
+*   [ ] CA3: El usuario puede abrir el flujo para solicitar el servicio desde aquí.
+*   [ ] CA4: Si el prestador está inactivo o no existe, se informa con claridad.
+*   [ ] CA5: La vista no pierde el contexto de navegación al regresar.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de detalle del prestador realizadas.
+*   [ ] Manejo de estados inexistentes o inactivos validado.
+*   [ ] Navegación de ida y vuelta confirmada.
+*   [ ] Persistencia de datos del prestador verificada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-16: Formulario de solicitud de servicio
-**Descripción:** Como proponente, agendaré al ofertante escogido tipeando el requerimiento del desperfecto u necesidad fechada local.
-**CA:**
-*   [ ] CA1: Formulario posee limitantes mínimos descriptivos obligatorios y un DatePicker para asegurar fechas agendadas a futuro validado para no permitir cronología retrasa anterior a tiempo Time.Now().
-*   [ ] CA2: Solicitud guarda exitosa atando en backend IDs entre Customer JWT actual y Target Provider ID originando Petición Base "Pending Revision".
-*   [ ] CA3: Enviar con descripciones vacías estalla invalidación Front avisando su falta de datos.
-*   [ ] CA4: Un hack desde el Motorizado a este API lanza reestructuración rebotando con Forbidden flag backend control.
-*   [ ] CA5: Cierra la vista arrojando "Lead Generado con Exito al obrero" redirigiendo al dashboard natural de la App.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como cliente, quiero enviar una solicitud de servicio con datos claros y validados.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario solicita la información necesaria para generar la solicitud.
+*   [ ] CA2: Los campos obligatorios se validan antes de enviar.
+*   [ ] CA3: La solicitud se asocia al cliente autenticado y al prestador correcto.
+*   [ ] CA4: Si el envío falla, la app informa el motivo sin perder la información ingresada.
+*   [ ] CA5: Al guardar correctamente, el usuario recibe confirmación visual.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de formulario y envío realizadas.
+*   [ ] Asociación cliente-prestador verificada.
+*   [ ] Manejo de errores y validaciones implementado.
+*   [ ] Persistencia de solicitudes confirmada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-17: Registro como prestador (file_picker + upload)
-**Descripción:** Como ciudadano me registro cargando form multipart de evidencia de certificaciones / CV documentado, solicitando validez gubernamental.
-**CA:**
-*   [ ] CA1: SDK File_picker funciona sobre los SO iOS Android abriendo árbol de archivos y subiendo validando extensiones puras admitidas (PDF, DOCX).
-*   [ ] CA2: Retención límite 8 MB si se ingresa peso de más en app móvil lanza "Límite Excedido File Size Alert" ahorrando HTTP fallidos a la api.
-*   [ ] CA3: La petición final muta multipart/form-data construida en capas nativas de dio con subida paulatina y barra per-cent visual a la UI informando % progression.
-*   [ ] CA4: El servidor ubica de modo absoluto y correcto en directorio Media/ root del Django persistiendo URLs de ubicación y atando a perfil prestador en validación pendiente False.
-*   [ ] CA5: Caída de subida por red se anula reportando el stack-trace limpio sin cierres destructivos de app permitiendo re intentarlo de nuevo por el usuario final.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como ciudadano, quiero registrarme como prestador subiendo documentación de soporte.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario permite subir archivos de soporte en formatos permitidos.
+*   [ ] CA2: El tamaño del archivo se valida antes de enviarlo al servidor.
+*   [ ] CA3: El upload se realiza correctamente mediante multipart/form-data.
+*   [ ] CA4: El prestador queda pendiente de aprobación tras el registro.
+*   [ ] CA5: Un error de red o archivo inválido se comunica con un mensaje claro.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de carga de archivos realizadas.
+*   [ ] Validación de extensiones y tamaño confirmada.
+*   [ ] Persistencia de documentos y perfil verificada.
+*   [ ] Flujo de aprobación pendiente confirmado.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-18: Panel del prestador con cambio de estado
-**Descripción:** Como trabajador contratado miro mis cotizaciones Lead recibidas aceptando en bandeja la resolución que aplicaré al pedido externo.
-**CA:**
-*   [ ] CA1: Observar una bandeja Inbox extraída de Backend model leads donde su `provider_id` empate al perfil actuante devolviendo las tareas y datos extra.
-*   [ ] CA2: Al cliquear Aceptado ejecuta Patch sobre Backend resolviendo acuerdo (Acuerdo Accepted Status Update) grabando fecha update actual relacional en SQL.
-*   [ ] CA3: Decline remueve lógicamente la tarea visual para desocupar la interfaz pasándola a un estatus negativo denegado.
-*   [ ] CA4: Disparar llamada al cliente es posible vía action button ejecutando Native Telephone dialler si hay numero guardado en objeto Customer extraído.
-*   [ ] CA5: Ninguno que no posea los roles "Prestador y/o Admin" parchará estas entidades blindadas.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como prestador, quiero ver mis solicitudes y cambiar mi estado operativo.
+**Puntos:** 3 | **Prioridad:** Media
+**Criterios de Aceptación:**
+*   [ ] CA1: El panel lista las solicitudes o actividades asignadas al prestador.
+*   [ ] CA2: El prestador puede aceptar o rechazar una solicitud según las reglas.
+*   [ ] CA3: El cambio de estado se refleja en la interfaz y en backend.
+*   [ ] CA4: Los usuarios sin rol autorizado no pueden modificar este estado.
+*   [ ] CA5: La vista muestra la información necesaria para operar con claridad.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de cambio de estado realizadas.
+*   [ ] Restricciones de rol verificadas.
+*   [ ] Persistencia del estado operativo confirmada.
+*   [ ] UX del panel validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ---
 
 ## 🛵 ÉPICA 05: Domicilios y Finanzas
 
 ### HU-19: Pantalla Domicilios con lista de disponibles
-**Descripción:** Como Motorizado independiente abro un Dashboard interactivo que capta tickets A->B pendientes públicos de cacería en mi metrópolis.
-**CA:**
-*   [ ] CA1: El pool list muestra los deliveries estatus `Pendiente` (Sin driver asignado) de manera fluida mostrando Puntos calles.
-*   [ ] CA2: Aceptar vincula permanentemente mi driver UID con la fila forzando Status Recogiendo arrojando un HTTP PATCH success model y removiéndolo en vivo del panel a los competidores.
-*   [ ] CA3: Concurrencia controlada, dos motorizados ganan el tap: Uno acepta 200 Okay y el segundo capta la excepción 400 "Has llegado Tarde ya fue tomado por colega motorizado".
-*   [ ] CA4: Domiciliario que no cumple nivel de habilitación no captura la tarjeta (Fallback o Denied).
-*   [ ] CA5: Lista auto pollea re refrescando en fondo para nuevos items por el thread provider.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como domiciliario, quiero ver las solicitudes disponibles para tomar trabajo.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La vista muestra solicitudes disponibles y no asignadas.
+*   [ ] CA2: El domiciliario puede aceptar una solicitud disponible.
+*   [ ] CA3: Al aceptar, la solicitud cambia de estado y deja de mostrarse como disponible.
+*   [ ] CA4: Si la solicitud ya fue tomada, la app informa el conflicto de forma clara.
+*   [ ] CA5: La pantalla se actualiza para reflejar nuevos domicilios disponibles.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de aceptación de domicilios realizadas.
+*   [ ] Concurrencia y bloqueo de asignación confirmados.
+*   [ ] Persistencia de estado de entrega verificada.
+*   [ ] Actualización visual validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-20: Panel financiero del domiciliario
-**Descripción:** Como conductor anhelo observar rendimientos sobre el saldo de tareas completadas de mi recolección histórica extraídas en vivo.
-**CA:**
-*   [ ] CA1: Sumatoria ORM de Django a nivel Backend expone un objeto Balance condensado calculando total flotante histórico por id.
-*   [ ] CA2: Muestra panel $0.0 sin caídas Float o NullExceptions nativas si Motorizado se encuentra virgen ante la base inicial de entregas.
-*   [ ] CA3: Posible tabulación para filtrar por rangos URL Parametrizados que envían '?mes=Actual' refrescando sumatorias UI sobre listado Frontal.
-*   [ ] CA4: Nadie ajeno interactúa esta URI o le es retornada su data gracias al DRF filter.
-*   [ ] CA5: Sub renglón detalla al motorizado las tareas pequeñas que originaron la suma del total de hoy al dar Tap.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como domiciliario, quiero revisar mis ingresos, egresos y balance acumulado.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El panel muestra ingresos, egresos y balance total de forma clara.
+*   [ ] CA2: Los valores se calculan correctamente incluso si no hay movimientos.
+*   [ ] CA3: La vista permite consultar el detalle de los movimientos registrados.
+*   [ ] CA4: Los datos mostrados corresponden solo al domiciliario autenticado.
+*   [ ] CA5: La pantalla maneja estados vacíos y recarga manual.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de cálculos y balance realizadas.
+*   [ ] Filtrado por usuario autenticado validado.
+*   [ ] Persistencia de movimientos y balance verificada.
+*   [ ] UX financiera y estados vacíos confirmados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-21: Registro de ingresos y egresos
-**Descripción:** Como motorizado deseo complementar finanzas anotando egresos diarios como (Gasolina, Mantenimientos) con inputs directos restando en visual contra la ganancia pasiva generada.
-**CA:**
-*   [ ] CA1: Creado form "Agregar Costo Operativo" impactando post básico en tabla auxiliar "Expenses" del Motorizado en Base de Datos de forma asíncrona validada en Django.
-*   [ ] CA2: Si se ingresan valores negativos la UI trunca la expresión previniendo envíos con cálculos irreales que alteran balances.
-*   [ ] CA3: Gráfica o Card Front realiza sencilla resta in-memory Provider de Flutter mostrando Profit: Total App (-) Egresos Extraordinarios.
-*   [ ] CA4: Desconectar internet prevendrá cargar gastos informando retardo limitando al Motorizado y manteniendo la cuenta sana hasta recuperarse el HTTP Dio Client connection local.
-*   [ ] CA5: Rol encriptado seguro; un Customer que fuerce URL no poseerá capacidad post arrojando HTTP 403 de base por restricciones seguras.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como domiciliario, quiero registrar ingresos y egresos para controlar mis finanzas.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario permite registrar ingresos y egresos con validación de valores.
+*   [ ] CA2: Los montos negativos o inválidos se rechazan con un mensaje claro.
+*   [ ] CA3: El balance se actualiza automáticamente después de guardar un movimiento.
+*   [ ] CA4: El registro queda asociado al domiciliario autenticado.
+*   [ ] CA5: Un fallo de conexión no borra la información ingresada por el usuario.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de creación de movimientos realizadas.
+*   [ ] Reglas de validación y cálculo confirmadas.
+*   [ ] Persistencia financiera verificada en backend.
+*   [ ] Control de acceso por rol validado.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ---
 
 ## 📞 ÉPICA 06: Contactos, Directorio y Llamadas
 
 ### HU-22: Directorio de contactos con buscador y filtros
-**Descripción:** Como Usuario app preciso del tabulador general categorizado con teléfonos utilitarios y públicos con un filtrador activo local para búsquedas veloces en la capa móvil.
-**CA:**
-*   [ ] CA1: Renderiza la tabla recibida de BDD pública en hileras o cards según sub categorías separando paramédicos / policías / cerrajeros institucionales.
-*   [ ] CA2: Search bar evalúa con `where`, matcheando case in sensitives el dictado (ej. Pol / POlí / PoL) exponiendo progresiva coincidencia textual y arrojando sin vacíos las cards con el target indicado.
-*   [ ] CA3: Filtrar fallidamente devuelve mensaje de error sereno "0 Encuentros en el renglón Base de Datos Público" y un botón "Limpiar Casilla Búsqueda".
-*   [ ] CA4: No requiere un login obligatorio cerrado por rol restrictivo o nivel al considerarse vista semi publica de los ciudadanos.
-*   [ ] CA5: Refresco Swipe detecta los campos desactivados como Soft Deletes en backend para no mostrarlos ya en la tabla frontend oculta.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como usuario, quiero buscar contactos de interés con filtros simples.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla muestra el directorio de contactos disponible.
+*   [ ] CA2: La búsqueda por nombre y filtro por categoría funcionan correctamente.
+*   [ ] CA3: Los contactos inactivos o eliminados no se muestran.
+*   [ ] CA4: Si no hay resultados, se muestra un estado vacío amigable.
+*   [ ] CA5: El contenido se actualiza al refrescar la vista.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de búsqueda y filtro realizadas.
+*   [ ] Estados vacíos y actualización confirmados.
+*   [ ] Persistencia del directorio verificada.
+*   [ ] Accesibilidad y UX revisadas.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-23: Llamada directa desde la app (url_launcher)
-**Descripción:** Como residente urgido pulsaré la tarjeta y el app se encargará de gestionar marcaciones a nivel plataforma externa delegando sin quiebres mi terminal móvil hacia el discador real telefónico central de Android / Ios sin cuelgues extraños.
-**CA:**
-*   [ ] CA1: Clic Tap efectúa puente in-App con modulo Flutter url_launcher forzando Scheme type "tel://888555".
-*   [ ] CA2: Enlaza directo abriendo el discador de fabrica celular marcando automático pre llenado los campos numerales permitiendo un solo click secundario para originar vía red móvil del cliente.
-*   [ ] CA3: Si ocurre fallo de paquete en un iPad u tableta sin red celular telefónica el Future bloquea el fallo e inserta un try Catch arrojando pop "Dispuesto No Soporta Llamadas Nativas Telefónicas directas" de forma educada al usuario previendo el Crash Nativo Fatal a la matriz del SO interno.
-*   [ ] CA4: Las llamadas omiten guardar caché interno asegurando privacidad de la aplicación general y eluden recargar recursos de internet base.
-*   [ ] CA5: Botón animado genera tinta indicativa tras toque Ripple de interacciones nativas confirmadas del material design.
-*   [ ] DoD universal cubierto ✅.
+**Descripción:** Como usuario, quiero llamar directamente a un contacto desde la aplicación.
+**Puntos:** 1 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Al pulsar el contacto, la app abre el marcador telefónico del dispositivo.
+*   [ ] CA2: Antes de llamar, se verifica que el dispositivo soporte la acción.
+*   [ ] CA3: Si no se puede iniciar la llamada, se muestra un mensaje claro.
+*   [ ] CA4: La acción no interrumpe la navegación ni el estado de la app.
+*   [ ] CA5: La experiencia de usuario se mantiene simple y directa.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de lanzamiento de llamada realizadas.
+*   [ ] Manejo de dispositivos no compatibles validado.
+*   [ ] Integración con el sistema telefónico confirmada.
+*   [ ] UX y permisos revisados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ---
 
 ## 📊 ÉPICA 07: Administración
 
 ### HU-24: Dashboard del admin (resumen y métricas)
-**Descripción:** Como ente responsable visualizo un panel general de cuadros condensando volumetrías contables registradas y métricas maestras con seguridad global total de la capa superior.
-**CA:**
-*   [ ] CA1: Mapeo de URL `/api/reports/dashboard` resolviendo conteos base de forma veraz devolviendo diccionarios contables (Users: x, Stores: y, Process: z) mostrando Tarjetas informativas de Flutter Front end.
-*   [ ] CA2: La capa HTTP prohíbe el tránsito tajante mediante el Permiso IS_STAFF true / o Rol Admin. Enseña un 403 Forbidden a la penetración no autorizada devolviendo intrusos al home en el frente de enrutamiento visual.
-*   [ ] CA3: Base resuelve agregados ORM optimizados para evitar sobre pasarse el rango de segundos permitidos de un timeout general.
-*   [ ] CA4: Datos en tabla de cero registros son resueltos e instanciados como `0` en vez de ocasionar bucles vacíos de renders Front nulos.
-*   [ ] CA5: Adaptabilidad a Landscape y dimensiones iPad resueltas en el diseño del frontend renderizado global adaptativo.
-*   [ ] DoD universal completado. ✅
+**Descripción:** Como administrador, quiero ver un panel con métricas generales del sistema.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El dashboard muestra conteos y métricas clave del sistema.
+*   [ ] CA2: Los datos se obtienen de endpoints protegidos por rol de administrador.
+*   [ ] CA3: Los valores se muestran correctamente incluso cuando no hay registros.
+*   [ ] CA4: La vista se adapta a diferentes tamaños de pantalla.
+*   [ ] CA5: Los errores de carga se comunican de forma clara.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de métricas y acceso realizadas.
+*   [ ] Restricciones de administrador verificadas.
+*   [ ] Persistencia de reportes y conteos confirmada.
+*   [ ] Adaptabilidad visual revisada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 ### HU-25: Aprobación/rechazo de prestadores desde admin
-**Descripción:** Como moderador evaluador listaré la masa de perfiles prestadores "Pendientes de validación" leyendo su archivo de anexo subido y clicando sus booleans autorizaciones determinantes expuestas frontalmente.
-**CA:**
-*   [ ] CA1: El ListView genera solo query a aquellos donde la columna `is_validated = False`.
-*   [ ] CA2: Enseña botón pre visual de descargas para atrapar la cadena URL remota enviada de PDF currículos ejecutándola sobre web browser viewer validando autenticidad documentara humana.
-*   [ ] CA3: Botón de aprobar envía patch enviando estado flag true moviéndolo a las bases publicas listadas generalistas.
-*   [ ] CA4: Clic Cancelar / Reject lo envía al listado denegado, purga la vista temporal de la capa Moderador y libera almacenamiento del servidor a elección final.
-*   [ ] CA5: Cierre asegurado por Barrera JWT is_admin total y no expone el fallo transaccional sin Rollbacks. El backend se re asegura de resguardar el status base transaccional original.
-*   [ ] DoD universal completado y cubierto en el resguardo veraz de base. ✅
+**Descripción:** Como administrador, quiero aprobar o rechazar prestadores pendientes de validación.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El listado muestra solo prestadores pendientes de validación.
+*   [ ] CA2: El administrador puede aprobar un prestador y cambiar su estado a activo.
+*   [ ] CA3: El administrador puede rechazar un prestador y registrar el motivo si aplica.
+*   [ ] CA4: Los usuarios sin permisos no pueden ejecutar estas acciones.
+*   [ ] CA5: La decisión tomada se refleja en la vista y en la base de datos.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de aprobación y rechazo realizadas.
+*   [ ] Control de permisos verificado.
+*   [ ] Persistencia del estado del prestador confirmada.
+*   [ ] Estados de aprobación y rechazo auditables.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
 
 *(Nota: Adicionalmente, todas las historias aplican un criterio exhaustivo de DoD enfocado en la completitud de código, tests en BBDD y manejos resilientes de conectividad base según lo exigido por el estándar ágil del formato maestro final de Runners.)*

@@ -38,6 +38,45 @@ def code(text):
     return para
 
 
+def add_requirement_table(
+    code,
+    name,
+    description,
+    actors,
+    precondition,
+    normal_seq,
+    alternate_seq="",
+    exceptions="",
+    postcondition="",
+    comments="",
+):
+    """Crea una tabla estandarizada para un requisito funcional individual."""
+    tbl = doc.add_table(rows=0, cols=3)
+    tbl.style = "Table Grid"
+    rows = [
+        ("Código", code, ""),
+        ("Nombre", name, ""),
+        ("Descripción", description, ""),
+        ("Actores", actors, ""),
+        ("Precondición", precondition, ""),
+        ("Secuencia normal", normal_seq, ""),
+    ]
+    if alternate_seq:
+        rows.append(("Secuencia alterna", alternate_seq, ""))
+    if exceptions:
+        rows.append(("Excepciones", exceptions, ""))
+    if postcondition:
+        rows.append(("Postcondición", postcondition, ""))
+    if comments:
+        rows.append(("Comentarios", comments, ""))
+    for label, v1, v2 in rows:
+        row = tbl.add_row().cells
+        row[0].text = f"**{label}**"
+        row[1].text = v1
+        row[2].text = v2
+    doc.add_paragraph()
+
+
 # ===================== PORTADA =====================
 title_p = doc.add_paragraph()
 title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -217,6 +256,19 @@ reqs = [
     ("REQ-13", "Admin", "Dashboard con métricas de operación"),
     ("REQ-14", "Admin", "Reportes de domicilios, servicios y tienda"),
     ("REQ-15", "Admin", "Gestión de usuarios, comercios y configuración"),
+    ("REQ-16", "Domicilios", "Registro y gestión de domiciliarios"),
+    ("REQ-17", "Domicilios", "Registro de ingresos y egresos de domiciliarios"),
+    ("REQ-18", "Autenticación", "Cierre de sesión seguro para invalidar tokens activos"),
+    ("REQ-19", "Autenticación", "Roles diferenciados y control de acceso por perfil"),
+    ("REQ-20", "Servicios", "Búsqueda de prestadores por categoría de servicio"),
+    ("REQ-21", "Servicios", "Cambio de estado del prestador (DISPONIBLE/OCUPADO/INACTIVO)"),
+    ("REQ-22", "Domicilios", "Cambio de estado del domiciliario (DISPONIBLE/OCUPADO/INACTIVO)"),
+    ("REQ-23", "Domicilios", "Solicitud directa de domicilio a un domiciliario disponible"),
+    ("REQ-24", "Contactos", "Filtrado de contactos por estado de disponibilidad"),
+    ("REQ-25", "Admin", "Reporte financiero agregado de domiciliarios"),
+    ("REQ-26", "Infraestructura", "Uso de variables de entorno (.env) para configuraciones sensibles"),
+    ("REQ-27", "Infraestructura", "PostgreSQL como base de datos de producción"),
+    ("REQ-28", "Seguridad API", "Configuración de CORS para el backend de Runners"),
 ]
 for r in reqs:
     row = tbl.add_row().cells
@@ -225,77 +277,419 @@ for r in reqs:
     row[2].text = r[2]
 doc.add_paragraph()
 
-for num, title_req, desc in [
-    (
-        "8.3",
-        "Registro de usuario (REQ-01)",
-        "El sistema permitirá a un nuevo usuario registrarse con nombre, apellido, correo y contraseña. El correo debe ser único (unique=True en modelo User).",
+h(2, "8.3 REQ-01 — Registro de usuario")
+add_requirement_table(
+    code="REQ-01",
+    name="Registro de usuario",
+    description=(
+        "Permite que un nuevo usuario cree una cuenta proporcionando nombre, correo y contraseña, "
+        "quedando registrado por defecto como CLIENTE (o como el rol permitido que seleccione)."
     ),
-    (
-        "8.4",
-        "Inicio de sesión (REQ-02)",
-        "El sistema permitirá iniciar sesión con correo y contraseña, retornando par de tokens JWT. El interceptor Dio renovará automáticamente el token ante respuestas 401.",
+    actors="Usuario (cliente, prestador, domiciliario, admin), App (Flutter/Web), API Django",
+    precondition="El usuario no debe estar registrado previamente con el mismo correo electrónico.",
+    normal_seq=(
+        "El usuario diligencia el formulario de registro, la app envía la solicitud al backend, "
+        "el backend valida datos y unicidad del correo y, si todo es correcto, crea el usuario y responde éxito."
     ),
-    (
-        "8.5",
-        "Visualización de tienda (REQ-03)",
-        "El cliente podrá visualizar comercios activos, filtrar por categoría, ver productos con nombre, descripción, precio e imagen.",
+    alternate_seq=(
+        "Si el correo ya existe, el backend rechaza el registro y la app muestra un mensaje indicando que el correo ya está registrado."
     ),
-    (
-        "8.6",
-        "Carrito y orden de compra (REQ-04/05)",
-        "El cliente podrá agregar productos al carrito (Hive), modificar cantidades y confirmar la compra creando una Orden con estado PENDIENTE.",
+    exceptions=(
+        "Errores de conexión o datos malformados se responden con códigos 4xx/5xx y mensajes estándar de error."
     ),
-    (
-        "8.7",
-        "Solicitud de domicilio (REQ-06/07)",
-        "El cliente creará una solicitud indicando dirección de recogida y entrega. El sistema asignará automáticamente el domiciliario DISPONIBLE de menor número asignado.",
+    postcondition=(
+        "El usuario queda creado en la base de datos con rol y estado inicial definidos y puede continuar al flujo de inicio de sesión (REQ-02)."
     ),
-    (
-        "8.8",
-        "Seguimiento de domicilio (REQ-08)",
-        "El cliente y domiciliario podrán consultar y actualizar el estado de la solicitud (PENDIENTE, ACEPTADO, EN_CAMINO, ENTREGADO, CANCELADO).",
+    comments=(
+        "La contraseña se almacena con hash seguro de Django y el correo se define como único en el modelo de usuario."
     ),
-    (
-        "8.9",
-        "Perfil de prestador (REQ-09)",
-        "Un PRESTADOR podrá completar su perfil con foto, descripción, categoría y hoja de vida. El perfil iniciará con approval_status = PENDIENTE.",
-    ),
-    (
-        "8.10",
-        "Aprobación de prestadores (REQ-10)",
-        "El administrador podrá revisar prestadores PENDIENTES y aprobar o rechazar con motivo de rechazo.",
-    ),
-    (
-        "8.11",
-        "Solicitud de servicio (REQ-11)",
-        "El cliente podrá solicitar un servicio a un prestador APROBADO con descripción y fecha programada.",
-    ),
-    (
-        "8.12",
-        "Directorio de contactos (REQ-12)",
-        "Todos los usuarios podrán consultar el directorio. Solo el ADMIN puede crear, editar y desactivar contactos.",
-    ),
-    (
-        "8.13",
-        "Dashboard administrativo (REQ-13)",
-        "El administrador tendrá métricas clave: usuarios por rol, órdenes activas, domicilios del día, servicios en curso.",
-    ),
-    (
-        "8.14",
-        "Reportes (REQ-14)",
-        "El sistema generará reportes de domicilios, servicios y ventas de tienda filtrados por período.",
-    ),
-    (
-        "8.15",
-        "Gestión administrativa (REQ-15)",
-        "El administrador podrá gestionar usuarios, comercios, SystemConfig y registros financieros de domiciliarios.",
-    ),
-]:
-    h(2, f"{num} {title_req}")
-    p(desc)
+)
 
-h(2, "8.16 Requerimientos no funcionales")
+h(2, "8.4 REQ-02 — Inicio de sesión y gestión de tokens JWT")
+add_requirement_table(
+    code="REQ-02",
+    name="Inicio de sesión y gestión de tokens JWT",
+    description=(
+        "Permite a los usuarios autenticarse con correo y contraseña para obtener tokens de acceso y refresco, "
+        "gestionando la renovación automática mientras la sesión siga vigente."
+    ),
+    actors="Cliente, Prestador, Domiciliario, Admin, App Flutter/Web, API Django",
+    precondition="El usuario debe estar registrado y activo en el sistema.",
+    normal_seq=(
+        "El usuario ingresa sus credenciales, la app envía la petición de login, el backend valida y retorna access_token y refresh_token, "
+        "la app almacena los tokens de forma segura, consulta el perfil y redirige según el rol."
+    ),
+    alternate_seq=(
+        "Si las credenciales son incorrectas o el usuario está suspendido, el backend rechaza la solicitud y la app muestra el mensaje apropiado."
+    ),
+    exceptions=(
+        "Si el access_token expira, el interceptor intenta renovarlo con el refresh_token; si este también falla, se cierra la sesión y se redirige al login."
+    ),
+    postcondition=(
+        "El usuario queda autenticado con tokens válidos almacenados y su perfil cargado en la app; el backend reconoce al usuario en peticiones subsecuentes."
+    ),
+    comments=(
+        "Se usa djangorestframework-simplejwt en backend y se recomiendan interceptores y guards de ruta en frontend."
+    ),
+)
+
+h(2, "8.5 REQ-03 — Visualización de tienda por categorías")
+add_requirement_table(
+    code="REQ-03",
+    name="Visualización de tienda por categorías",
+    description=(
+        "Permite al cliente explorar la tienda, filtrar por categorías y ver el catálogo de comercios y productos disponibles con su información básica."
+    ),
+    actors="Cliente, App Flutter/Web, API Django",
+    precondition=(
+        "El cliente debe estar autenticado y deben existir categorías, comercios y productos registrados y activos."
+    ),
+    normal_seq=(
+        "El cliente ingresa al módulo de tienda, la app consulta categorías y comercios, muestra los productos por categoría y permite seleccionar productos para el carrito."
+    ),
+)
+
+h(2, "8.6 REQ-04/REQ-05 — Carrito y orden de compra")
+add_requirement_table(
+    code="REQ-04 / REQ-05",
+    name="Carrito de compras y generación de orden",
+    description=(
+        "Permite al cliente agregar productos al carrito, ajustar cantidades y confirmar un pedido, "
+        "generando una orden en el backend con estado inicial PENDIENTE."
+    ),
+    actors="Cliente, App Flutter/Web, API Django, Comercio",
+    precondition=(
+        "El cliente debe estar autenticado, haber seleccionado productos válidos y existir productos disponibles asociados a un comercio."
+    ),
+    normal_seq=(
+        "El cliente agrega productos al carrito, revisa el resumen, confirma la compra y la app envía la orden al backend, que valida y crea la Orden y sus ítems."
+    ),
+    alternate_seq="El cliente puede vaciar o modificar el carrito antes de confirmar la orden.",
+    exceptions=(
+        "Si hay productos inactivos o datos inconsistentes en el carrito, el backend rechaza la orden con mensajes de validación."
+    ),
+)
+
+h(2, "8.7 REQ-06/REQ-07 — Solicitud de domicilio y asignación automática")
+add_requirement_table(
+    code="REQ-06 / REQ-07",
+    name="Solicitud de domicilio y asignación automática",
+    description=(
+        "Permite al cliente solicitar un domicilio indicando datos de recogida y entrega, mientras el sistema asigna automáticamente un domiciliario disponible siguiendo una regla de negocio definida."
+    ),
+    actors="Cliente, Domiciliario, App Flutter/Web, API Django",
+    precondition=(
+        "El cliente debe estar autenticado y debe existir al menos un domiciliario con estado DISPONIBLE."
+    ),
+    normal_seq=(
+        "El cliente crea la solicitud de domicilio, el backend la registra y ejecuta la lógica de asignación automática para seleccionar un domiciliario disponible y actualizar el estado."
+    ),
+    alternate_seq=(
+        "Si no hay domiciliarios DISPONIBLE, la solicitud puede quedar en espera y se notifica al cliente de la falta de disponibilidad."
+    ),
+)
+
+h(2, "8.8 REQ-08 — Seguimiento de domicilio")
+add_requirement_table(
+    code="REQ-08",
+    name="Seguimiento del estado del domicilio",
+    description=(
+        "Permite a cliente y domiciliario consultar y actualizar el estado de una solicitud de domicilio a lo largo de su ciclo de vida."
+    ),
+    actors="Cliente, Domiciliario, Administrador, App Flutter/Web, API Django",
+    precondition="Debe existir una solicitud de domicilio registrada y los usuarios deben estar autenticados.",
+    normal_seq=(
+        "El cliente consulta el detalle y ve el estado, el domiciliario actualiza el estado según avanza la entrega y el backend registra cada cambio mediante endpoints dedicados."
+    ),
+)
+
+h(2, "8.9 REQ-09 — Perfil de prestador de servicios")
+add_requirement_table(
+    code="REQ-09",
+    name="Gestión de perfil de prestador de servicios",
+    description=(
+        "Permite a un usuario con rol PRESTADOR completar y actualizar su perfil profesional, incluyendo foto, descripción, categoría y hoja de vida."
+    ),
+    actors="Prestador de Servicio, Administrador, App Flutter/Web, API Django",
+    precondition="El usuario debe estar registrado con rol PRESTADOR y autenticado en la app.",
+    normal_seq=(
+        "El prestador accede a su perfil, completa o actualiza la información y adjunta archivos; la app envía los datos y el backend guarda el perfil en estado PENDIENTE."
+    ),
+)
+
+h(2, "8.10 REQ-10 — Aprobación de prestadores")
+add_requirement_table(
+    code="REQ-10",
+    name="Aprobación o rechazo de prestadores de servicios",
+    description=(
+        "Permite al administrador revisar los perfiles de prestadores y decidir si aprueba o rechaza su participación en la plataforma."
+    ),
+    actors="Administrador, Prestador de Servicio, API Django, App Flutter/Web",
+    precondition=(
+        "Deben existir perfiles de prestadores en estado PENDIENTE y el administrador debe estar autenticado con rol ADMIN."
+    ),
+    normal_seq=(
+        "El administrador revisa los perfiles pendientes, decide aprobar o rechazar y el backend actualiza el estado y registra el motivo si aplica."
+    ),
+)
+
+h(2, "8.11 REQ-11 — Solicitud de servicio")
+add_requirement_table(
+    code="REQ-11",
+    name="Solicitud de servicio a prestador aprobado",
+    description=(
+        "Permite al cliente solicitar un servicio a un prestador aprobado, definiendo los detalles básicos y permitiendo su aceptación o rechazo por parte del prestador."
+    ),
+    actors="Cliente, Prestador de Servicio, App Flutter/Web, API Django",
+    precondition=(
+        "Debe existir al menos un prestador en estado APROBADO y tanto cliente como prestador deben estar autenticados."
+    ),
+    normal_seq=(
+        "El cliente crea la solicitud hacia un prestador aprobado, el backend la guarda en estado PENDIENTE y el prestador puede aceptarla o rechazarla desde su panel."
+    ),
+)
+
+h(2, "8.12 REQ-12 — Directorio de contactos")
+add_requirement_table(
+    code="REQ-12",
+    name="Directorio de contactos de emergencia y utilidad",
+    description=(
+        "Permite a los usuarios consultar un directorio de contactos relevantes (emergencias, profesionales, comercios) y al administrador gestionar su contenido."
+    ),
+    actors="Cliente, Prestador, Domiciliario, Admin, API Django, App Flutter/Web",
+    precondition="Deben existir contactos registrados y los usuarios deben estar autenticados según políticas definidas.",
+    normal_seq=(
+        "El usuario accede al módulo de contactos, la app consulta y muestra la lista y permite aplicar filtros o búsquedas; el administrador puede crear, editar o desactivar contactos."
+    ),
+)
+
+h(2, "8.13 REQ-13 — Dashboard administrativo")
+add_requirement_table(
+    code="REQ-13",
+    name="Panel de métricas administrativas",
+    description=(
+        "Proporciona al administrador un panel con indicadores clave sobre usuarios, órdenes, domicilios y servicios para el monitoreo operativo."
+    ),
+    actors="Administrador, API Django, App Flutter/Web",
+    precondition="El administrador debe estar autenticado y deben existir datos registrados en el sistema.",
+    normal_seq=(
+        "El administrador abre el dashboard, la app consulta el endpoint de resumen y el backend responde con métricas agregadas que se muestran en tarjetas y gráficos."
+    ),
+)
+
+h(2, "8.14 REQ-14 — Reportes de operación")
+add_requirement_table(
+    code="REQ-14",
+    name="Generación de reportes de tienda, servicios y domicilios",
+    description=(
+        "Permite al administrador consultar reportes filtrados sobre domicilios realizados, servicios prestados y ventas de tienda para periodos definidos."
+    ),
+    actors="Administrador, API Django, App Flutter/Web",
+    precondition="El administrador debe estar autenticado y debe existir información histórica suficiente.",
+    normal_seq=(
+        "El administrador selecciona tipo de reporte y filtros, la app envía la consulta y el backend ejecuta agregaciones y devuelve los datos para mostrarlos en tablas o gráficos."
+    ),
+)
+
+h(2, "8.15 REQ-15 — Gestión administrativa")
+add_requirement_table(
+    code="REQ-15",
+    name="Gestión administrativa de usuarios, comercios y configuración",
+    description=(
+        "Permite al administrador gestionar usuarios, comercios, parámetros de configuración y registros financieros asociados a domiciliarios."
+    ),
+    actors="Administrador, API Django, App Flutter/Web",
+    precondition="El administrador debe estar autenticado con rol ADMIN.",
+    normal_seq=(
+        "El administrador accede al módulo de administración, gestiona altas y bajas lógicas de usuarios y comercios y ajusta parámetros clave del sistema."
+    ),
+)
+
+h(2, "8.16 REQ-16 — Registro y gestión de domiciliarios")
+add_requirement_table(
+    code="REQ-16",
+    name="Registro y gestión de domiciliarios",
+    description=(
+        "Permite registrar domiciliarios con sus datos básicos y gestionar su estado (DISPONIBLE/OCUPADO/INACTIVO), de modo que puedan participar en el módulo de domicilios."
+    ),
+    actors="Administrador, Domiciliario, API Django, App (panel de domiciliarios/web)",
+    precondition=(
+        "El administrador debe estar autenticado con rol ADMIN y debe existir o crearse un usuario base asociado al domiciliario."
+    ),
+    normal_seq=(
+        "El administrador registra al domiciliario con sus datos, el backend valida unicidad del número asignado y crea el registro con estado DISPONIBLE e is_active=True."
+    ),
+)
+
+h(2, "8.17 REQ-17 — Registro de ingresos y egresos de domiciliarios")
+add_requirement_table(
+    code="REQ-17",
+    name="Registro de ingresos y egresos de domiciliarios",
+    description=(
+        "Permite a los domiciliarios registrar ingresos por servicios realizados y egresos (gastos), para llevar control de su balance y de la comisión que corresponde a Runners."
+    ),
+    actors="Domiciliario, Administrador, API Django, App (panel de domiciliarios/web)",
+    precondition="Debe existir un domiciliario registrado asociado al usuario autenticado.",
+    normal_seq=(
+        "El domiciliario accede a su panel financiero, registra ingresos o egresos y el backend guarda FinancialRecord y actualiza los totales calculados."
+    ),
+)
+
+h(2, "8.18 REQ-18 — Cierre de sesión seguro")
+add_requirement_table(
+    code="REQ-18",
+    name="Cierre de sesión seguro",
+    description=(
+        "Permite al usuario cerrar sesión de forma segura, eliminando los tokens almacenados y evitando que permanezcan activos en el dispositivo."
+    ),
+    actors="Usuario autenticado, App Flutter/Web",
+    precondition="El usuario debe estar autenticado y tener tokens activos almacenados en el cliente.",
+    normal_seq=(
+        "El usuario selecciona la opción de cerrar sesión, la app limpia los tokens del almacenamiento seguro y redirige a la pantalla de login."
+    ),
+)
+
+h(2, "8.19 REQ-19 — Roles diferenciados y control de acceso")
+add_requirement_table(
+    code="REQ-19",
+    name="Roles diferenciados y control de acceso",
+    description=(
+        "Define y aplica roles de usuario (CLIENTE, PRESTADOR, DOMICILIARIO, ADMIN) para controlar el acceso a pantallas y endpoints."
+    ),
+    actors="Todos los usuarios, Backend Django, Frontend Flutter/Web",
+    precondition="El usuario debe estar autenticado con un rol válido.",
+    normal_seq=(
+        "El backend incluye el rol en el token o perfil, el frontend lee el rol y muestra sólo las pantallas permitidas, mientras el backend aplica permisos por rol en cada endpoint."
+    ),
+)
+
+h(2, "8.20 REQ-20 — Búsqueda de prestadores por categoría")
+add_requirement_table(
+    code="REQ-20",
+    name="Búsqueda de prestadores por categoría",
+    description=(
+        "Permite a los clientes buscar prestadores de servicios filtrando por categoría para encontrar al profesional adecuado."
+    ),
+    actors="Cliente, App Flutter/Web, API Django",
+    precondition="Debe existir al menos un prestador aprobado asociado a categorías de servicios.",
+    normal_seq=(
+        "El cliente selecciona una categoría o aplica filtros, la app consulta el backend y muestra la lista de prestadores aprobados que cumplen los criterios."
+    ),
+)
+
+h(2, "8.21 REQ-21 — Cambio de estado del prestador")
+add_requirement_table(
+    code="REQ-21",
+    name="Cambio de estado del prestador",
+    description=(
+        "Permite actualizar el estado del prestador (DISPONIBLE/OCUPADO/INACTIVO) para reflejar su disponibilidad en el módulo de servicios."
+    ),
+    actors="Prestador, Administrador, API Django, App Flutter/Web",
+    precondition="El prestador debe existir y estar aprobado en la plataforma.",
+    normal_seq=(
+        "El prestador o el administrador cambia el estado desde su panel y el backend actualiza el registro para afectar su visibilidad y disponibilidad en las búsquedas."
+    ),
+)
+
+h(2, "8.22 REQ-22 — Cambio de estado del domiciliario")
+add_requirement_table(
+    code="REQ-22",
+    name="Cambio de estado del domiciliario",
+    description=(
+        "Permite actualizar el estado del domiciliario (DISPONIBLE/OCUPADO/INACTIVO) para controlar la asignación automática de domicilios."
+    ),
+    actors="Domiciliario, Administrador, API Django, App Flutter/Web",
+    precondition="El domiciliario debe estar registrado y activo.",
+    normal_seq=(
+        "El domiciliario o el administrador modifica el estado y el backend actualiza el registro, afectando su inclusión en la lógica de asignación automática."
+    ),
+)
+
+h(2, "8.23 REQ-23 — Solicitud directa de domicilio a un domiciliario disponible")
+add_requirement_table(
+    code="REQ-23",
+    name="Solicitud directa de domicilio a domiciliario disponible",
+    description=(
+        "Permite que el administrador o un flujo específico envíe una solicitud de domicilio dirigida a un domiciliario disponible en particular."
+    ),
+    actors="Administrador, Domiciliario, API Django, App Flutter/Web",
+    precondition="Debe existir un domiciliario en estado DISPONIBLE y un cliente o solicitud que requiera servicio.",
+    normal_seq=(
+        "Se selecciona un domiciliario disponible, se crea la solicitud de domicilio asociada a él y el backend registra el vínculo y el estado inicial correspondiente."
+    ),
+)
+
+h(2, "8.24 REQ-24 — Filtrado de contactos por disponibilidad")
+add_requirement_table(
+    code="REQ-24",
+    name="Filtrado de contactos por disponibilidad",
+    description=(
+        "Permite filtrar el directorio de contactos por estado de disponibilidad o tipo para facilitar la búsqueda de información útil."
+    ),
+    actors="Usuario, App Flutter/Web, API Django",
+    precondition="Deben existir contactos con distintos tipos o estados registrados.",
+    normal_seq=(
+        "El usuario aplica filtros sobre el directorio y la app consulta el backend o filtra localmente para mostrar sólo los contactos que cumplen los criterios."
+    ),
+)
+
+h(2, "8.25 REQ-25 — Reporte financiero agregado de domiciliarios")
+add_requirement_table(
+    code="REQ-25",
+    name="Reporte financiero agregado de domiciliarios",
+    description=(
+        "Permite al administrador consultar un reporte agregado de ingresos, egresos y comisiones de los domiciliarios."
+    ),
+    actors="Administrador, API Django, App Flutter/Web",
+    precondition="Deben existir registros financieros asociados a domiciliarios.",
+    normal_seq=(
+        "El administrador accede al módulo de reportes financieros, selecciona filtros de fecha y el backend agrega los FinancialRecord por domiciliario y retorna los totales."
+    ),
+)
+
+h(2, "8.26 REQ-26 — Uso de variables de entorno (.env)")
+add_requirement_table(
+    code="REQ-26",
+    name="Uso de variables de entorno (.env)",
+    description=(
+        "Establece el uso de variables de entorno para credenciales, claves secretas y configuraciones sensibles tanto en backend como en frontend."
+    ),
+    actors="Equipo de despliegue, Backend Django, Frontend Flutter/Web",
+    precondition="Debe existir un archivo .env o mecanismo equivalente configurado en cada entorno.",
+    normal_seq=(
+        "Durante la configuración, se definen las variables necesarias (SECRET_KEY, credenciales de BD, URLs, etc.) y la aplicación las lee sin exponer valores sensibles en el código fuente."
+    ),
+)
+
+h(2, "8.27 REQ-27 — Configuración de PostgreSQL como base de datos de producción")
+add_requirement_table(
+    code="REQ-27",
+    name="Configuración de PostgreSQL como base de datos de producción",
+    description=(
+        "Define que, para entornos de producción, la base de datos relacional utilizada será PostgreSQL, reemplazando SQLite del entorno de desarrollo."
+    ),
+    actors="Equipo de infraestructura, Backend Django",
+    precondition="Debe existir una instancia de PostgreSQL accesible y credenciales configuradas en variables de entorno.",
+    normal_seq=(
+        "En el entorno de producción se configura Django para usar PostgreSQL, se ejecutan migraciones y se verifica el correcto funcionamiento de la API contra la nueva base de datos."
+    ),
+)
+
+h(2, "8.28 REQ-28 — Configuración de CORS para el backend de Runners")
+add_requirement_table(
+    code="REQ-28",
+    name="Configuración de CORS para el backend de Runners",
+    description=(
+        "Establece la configuración de CORS en el backend para permitir que los frontends autorizados (web/móvil) consuman la API de forma segura."
+    ),
+    actors="Equipo de infraestructura, Backend Django",
+    precondition="El proyecto debe tener instalado y configurado django-cors-headers u otra solución equivalente.",
+    normal_seq=(
+        "Se definen los orígenes permitidos y encabezados necesarios para las peticiones desde los clientes, restringiendo el acceso desde dominios no autorizados."
+    ),
+)
+
+h(2, "8.29 Requerimientos no funcionales")
 tbl2 = doc.add_table(rows=1, cols=3)
 tbl2.style = "Table Grid"
 hdr2 = tbl2.rows[0].cells
@@ -306,7 +700,7 @@ rnfs = [
     (
         "RNF-01",
         "Seguridad",
-        "Contraseñas hash bcrypt, JWT para sesiones, FlutterSecureStorage para tokens",
+        "Contraseñas hash bcrypt, JWT para sesiones, FlutterSecureStorage para tokens y uso de variables de entorno (.env) para credenciales y secretos.",
     ),
     ("RNF-02", "Rendimiento", "Latencia < 500ms; paginación en listados extensos"),
     ("RNF-03", "Escalabilidad", "Clean Architecture; compatible con Docker"),
@@ -323,12 +717,22 @@ rnfs = [
     (
         "RNF-06",
         "Compatibilidad",
-        "Android 5.0+ / iOS 12+; PostgreSQL en producción",
+        "Aplicación móvil Android/iOS; backend compatible con PostgreSQL en producción",
     ),
     (
         "RNF-07",
         "Disponibilidad",
         "Backend 24/7 en producción con gunicorn/supervisor",
+    ),
+    (
+        "RNF-08",
+        "Infraestructura",
+        "Uso de PostgreSQL como base de datos de producción para garantizar escalabilidad, rendimiento y confiabilidad.",
+    ),
+    (
+        "RNF-09",
+        "Seguridad API",
+        "Configuración adecuada de CORS en el backend para permitir que el frontend (web/móvil) se comunique con la API sin exponer el sistema a orígenes no autorizados.",
     ),
 ]
 for r in rnfs:
@@ -731,10 +1135,194 @@ p(
     italic=True,
 )
 
+h(6, "14.4.7 Diagramas de secuencia")
+p(
+    "Principales diagramas de secuencia del sistema Runners para los flujos criticos de autenticacion, tienda y domicilios."
+)
+
+h(6, "14.4.7.1 Autenticacion y enrutamiento por rol")
+for item in [
+    "El usuario ingresa correo y contrasena en la App Flutter.",
+    "La app envia POST /api/v1/auth/login/ a la API Django (Auth).",
+    "El backend valida credenciales y retorna tokens JWT (access, refresh) y el rol del usuario.",
+    "La app guarda los tokens en FlutterSecureStorage.",
+    "La capa de enrutamiento (GoRouter) recibe el rol autenticado.",
+    "GoRouter redirige a la Shell correspondiente (cliente, domiciliario, prestador, admin).",
+    "El usuario visualiza la pantalla inicial propia de su rol.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.2 Compra en tienda y creacion de orden")
+for item in [
+    "El cliente navega por la tienda y agrega productos al carrito.",
+    "La app actualiza el carrito local usando Hive (persistencia offline).",
+    "Al confirmar el carrito, la app construye el payload de la orden.",
+    "Se envia POST /api/v1/store/orders/ con los productos y cantidades.",
+    "El backend crea la Order y los OrderItems en la base de datos.",
+    "La API responde 201 Created con el detalle de la orden y su estado inicial PENDIENTE.",
+    "La app muestra al cliente el resumen de compra y el estado de la orden.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.3 Solicitud de domicilio con asignacion automatica")
+for item in [
+    "El cliente completa el formulario de domicilio (origen, destino, descripcion).",
+    "La app envia POST /api/v1/deliveries/requests/ a la API de domicilios.",
+    "El backend busca un domiciliario con estado DISPONIBLE y menor assigned_number.",
+    "Si encuentra uno, crea un DeliveryRequest asociado al domiciliario; de lo contrario, deja deliverer = null.",
+    "La API responde 201 Created con la solicitud y el estado inicial (ACEPTADO o PENDIENTE).",
+    "La app muestra al cliente el detalle y el estado del domicilio.",
+    "El domiciliario ve la solicitud asignada y actualiza su estado (EN_CAMINO, ENTREGADO), generando registros financieros.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.4 Registro de usuario con emision de tokens")
+for item in [
+    "El usuario diligencia el formulario de registro en la App Flutter.",
+    "La app envia POST /api/v1/auth/register/ a la API de usuarios.",
+    "El backend valida los datos y crea un nuevo User en la base de datos.",
+    "Se generan automaticamente los tokens JWT (access y refresh) para el nuevo usuario.",
+    "La API responde 201 Created con los datos del usuario y los tokens.",
+    "La app guarda los tokens en FlutterSecureStorage para sesiones posteriores.",
+    "La navegacion redirige al flujo inicial segun el rol (CLIENTE por defecto o PRESTADOR en proceso de aprobacion).",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.5 Registro y aprobacion de prestador de servicios")
+for item in [
+    "Un usuario autenticado completa su perfil como prestador (foto, descripcion, categoria, HV).",
+    "La app envia POST /api/v1/services/providers/register/ a la API de servicios.",
+    "El backend crea el objeto ServiceProvider con approval_status = PENDIENTE.",
+    "Se actualiza el rol del usuario a PRESTADOR manteniendo sus credenciales.",
+    "El administrador consulta la lista de prestadores pendientes desde el dashboard.",
+    "La app envia la decision (approve o reject) a un endpoint de aprobacion de prestadores.",
+    "El backend actualiza approval_status, status y los campos de auditoria (approved_by, approved_at, rejection_reason).",
+    "El prestador es notificado en la app sobre el resultado de la revision.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.6 Solicitud de servicio entre cliente y prestador")
+for item in [
+    "El cliente navega por el directorio de prestadores aprobados desde la app.",
+    "La app consulta la API de servicios filtrando prestadores con approval_status = APROBADO.",
+    "El cliente selecciona un prestador, define fecha y descripcion del servicio requerido.",
+    "Se envia POST /api/v1/services/requests/ para crear la solicitud de servicio.",
+    "El backend registra un ServiceRequest asociado al cliente y al prestador con un estado inicial (por ejemplo, REGISTRADA).",
+    "El cliente visualiza la confirmacion y el estado de su solicitud en la app.",
+    "El prestador consulta sus solicitudes desde la app (modo PRESTADOR) usando la lista de ServiceRequest asignados.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.4.7.7 Consulta de contactos y dashboard administrador")
+for item in [
+    "Cualquier usuario abre el modulo de contactos en la app.",
+    "La app consulta GET /api/v1/contacts/ aplicando filtros por tipo de contacto cuando corresponde.",
+    "La API retorna solo los contactos activos, que se muestran en la interfaz con opciones rapidas de llamada.",
+    "El administrador ingresa al dashboard administrativo desde su Shell.",
+    "La app llama al endpoint de resumen (dashboard) para obtener metricas de usuarios, ordenes, domicilios y servicios.",
+    "La informacion recibida se presenta en tarjetas y graficos que resumen el estado operativo de la plataforma.",
+]:
+    bp = doc.add_paragraph(style="List Number")
+    bp.add_run(item).font.name = "Calibri"
+
 h(6, "14.5 Prototipado")
 p(
     "Prototipo funcional en Flutter que incluye pantallas de login/registro, home por modulos segun rol, tienda con carrito, flujo de domicilios, directorio de servicios y contactos, y panel de administracion."
 )
+
+h(6, "14.6 Plan de pruebas y aseguramiento de la calidad")
+p(
+    "Plan de pruebas del proyecto Runners para validar requisitos funcionales y no funcionales en todos los modulos."
+)
+
+h(6, "14.6.1 Objetivos de las pruebas")
+for item in [
+    "Verificar el cumplimiento de los requisitos funcionales y no funcionales descritos para cada modulo.",
+    "Detectar defectos de forma temprana durante el ciclo de desarrollo para reducir el costo de correccion.",
+    "Asegurar la estabilidad de los flujos criticos: autenticacion, tienda, domicilios, servicios y administracion.",
+    "Validar que el sistema sea utilizable y comprensible para CLIENTE, PRESTADOR, DOMICILIARIO y ADMIN.",
+    "Proveer evidencia documentada del funcionamiento correcto del sistema para la evaluacion academica.",
+]:
+    bp = doc.add_paragraph(style="List Bullet")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.6.2 Alcance y niveles de prueba")
+p(
+    "Se consideran pruebas unitarias (parciales), de integracion, de sistema end-to-end y de aceptacion academica."
+)
+for item in [
+    "Pruebas unitarias parciales en backend (logica de negocio en modelos y funciones auxiliares) y en frontend (widgets y validacion de formularios).",
+    "Pruebas de integracion entre Flutter y Django usando Dio y la API REST (serializacion/deserializacion correcta).",
+    "Pruebas de sistema (end-to-end) que recorren flujos completos por rol, incluyendo escenarios de exito y error.",
+    "Pruebas de aceptacion academica mediante demostraciones guiadas de los casos de uso principales.",
+]:
+    bp = doc.add_paragraph(style="List Bullet")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.6.3 Estrategia de pruebas por modulo")
+tbl_tp = doc.add_table(rows=1, cols=4)
+tbl_tp.style = "Table Grid"
+hdr_tp = tbl_tp.rows[0].cells
+hdr_tp[0].text = "Modulo"
+hdr_tp[1].text = "Tipo de pruebas"
+hdr_tp[2].text = "Herramientas"
+hdr_tp[3].text = "Descripcion"
+estrategia = [
+    ("Autenticacion y usuarios", "Integracion, sistema", "Postman, App Flutter, Django Admin", "Registro, login, logout, perfil y restricciones por rol."),
+    ("Tienda", "Integracion, sistema", "Postman, App Flutter", "Listado de comercios/productos, carrito y ordenes."),
+    ("Domicilios", "Integracion, sistema", "Postman, App Flutter", "Solicitudes, autoasignacion, estados y registros financieros."),
+    ("Servicios", "Integracion, sistema", "Postman, App Flutter, Django Admin", "Registro de prestadores, aprobacion/rechazo y ciclo de solicitudes."),
+    ("Contactos", "Sistema", "Postman, App Flutter", "Directorio publico filtrado y gestion por administrador."),
+    ("Administracion y reportes", "Sistema", "Postman, App Flutter", "Dashboard, reportes de ventas, domiciliarios y servicios."),
+]
+for modulo, tipo_p, herramientas, desc in estrategia:
+    row = tbl_tp.add_row().cells
+    row[0].text = modulo
+    row[1].text = tipo_p
+    row[2].text = herramientas
+    row[3].text = desc
+doc.add_paragraph()
+
+h(6, "14.6.4 Casos de prueba representativos")
+casos_tp = [
+    "PT-01 – Registro exitoso de usuario (HU-01, UC-01): crear usuario, generar tokens y redirigir segun rol.",
+    "PT-02 – Inicio de sesion con credenciales invalidas (HU-02, UC-02): respuesta 401 y mensaje de error amigable.",
+    "PT-03 – Flujo completo de compra en tienda (HU-04 a HU-07): listar, agregar al carrito, confirmar y verificar historial.",
+    "PT-04 – Solicitud de domicilio sin domiciliarios disponibles (HU-08): mensaje de indisponibilidad y sin creacion de registro.",
+    "PT-05 – Aprobacion de prestador y visibilidad en directorio (HU-14, HU-19): cambio de estado y aparicion en listado publico.",
+    "PT-06 – Directorio de contactos filtrado (HU-16, HU-17): filtros por tipo EMERGENCIA, COMERCIO, PROFESIONAL.",
+    "PT-07 – Dashboard administrativo coherente (HU-18, HU-21): metricas y totales consistentes con los datos en BD.",
+]
+for item in casos_tp:
+    bp = doc.add_paragraph(style="List Bullet")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.6.5 Entorno de pruebas")
+for item in [
+    "Backend: Django 5.2.6 + DRF 3.16.1 sobre Python 3.12 con base de datos SQLite (db.sqlite3) y datos semilla.",
+    "Frontend: App Flutter en emulador Android o dispositivo fisico, con archivo .env apuntando al backend local.",
+    "Herramientas de apoyo: Postman (coleccion runners_api_postman.json) y Django Admin para inspeccion rapida durante pruebas.",
+]:
+    bp = doc.add_paragraph(style="List Bullet")
+    bp.add_run(item).font.name = "Calibri"
+
+h(6, "14.6.6 Criterios de aceptacion y salida")
+for item in [
+    "Todos los casos de prueba criticos (PT-01 a PT-07) ejecutados sin errores bloqueantes.",
+    "Sin errores de severidad alta abiertos en autenticacion, tienda, domicilios o servicios al finalizar el ciclo de pruebas.",
+    "Ejecucion completa y coherente de los casos de uso UC-01 a UC-13 de principio a fin.",
+    "Ejecucion de pruebas de regresion basicas tras cambios significativos en modelos/serializers y providers principales.",
+]:
+    bp = doc.add_paragraph(style="List Bullet")
+    bp.add_run(item).font.name = "Calibri"
+
+p("La evidencia de ejecucion incluye capturas de pantalla, videos de flujos principales y registros de llamadas en Postman.")
 
 # ===================== 15. CASOS DE USO =====================
 h(1, "15. Casos de uso (detallados)")

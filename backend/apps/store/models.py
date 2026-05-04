@@ -20,8 +20,16 @@ class Category(models.Model):
 
 class Commerce(models.Model):
     """Representa un restaurante o almacén registrado en la tienda."""
+    class BusinessType(models.TextChoices):
+        RESTAURANTE = 'RESTAURANTE', 'Restaurante'
+        TIENDA = 'TIENDA', 'Tienda'
+        FARMACIA = 'FARMACIA', 'Farmacia'
+        SUPERMERCADO = 'SUPERMERCADO', 'Supermercado'
+        OTRO = 'OTRO', 'Otro'
+
     category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='commerces')
     name = models.CharField(max_length=200)
+    business_type = models.CharField(max_length=20, choices=BusinessType.choices, default=BusinessType.OTRO)
     description = models.TextField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
     address = models.CharField(max_length=255, blank=True)

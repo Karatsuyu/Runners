@@ -9,7 +9,7 @@ runners/
 ├── 📁 frontend/    ← App Flutter (móvil, web, escritorio)
 ├── 📁 backend/     ← API Django (REST Framework)
 ├── 📁 .venv/       ← Entorno Python
-└── 📚 Documentación (8 guías)
+└── 📚 Documentación (9+ guías)
 ```
 
 ---
@@ -33,6 +33,10 @@ flutter run
 ---
 
 ## 📚 Documentación (elige una según necesites)
+
+### 🧩 Si quieres todo en un único documento
+👉 **[DOCUMENTACION_MAESTRA_RUNNERS.md](DOCUMENTACION_MAESTRA_RUNNERS.md)**
+- Consolidado total del proyecto (problema, requisitos, arquitectura, API, estructura, gestión y riesgos)
 
 ### 🔥 Si quieres ejecutar inmediatamente
 👉 **[QUICKSTART.md](QUICKSTART.md)**

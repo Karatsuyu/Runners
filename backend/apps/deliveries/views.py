@@ -9,6 +9,9 @@ from .models import (
     FinancialRecord,
     SystemConfig,
     DeliveryChatMessage,
+    DeliveryZone,
+    DeliveryPricingRule,
+    DeliveryCommerceHistory,
 )
 from apps.users.permissions import IsAdmin, IsDomiciliario
 from apps.users.models import User
@@ -139,6 +142,8 @@ class DelivererAdminSerializer(serializers.ModelSerializer):
 
 
 class FinancialRecordSerializer(serializers.ModelSerializer):
+    deliverer_name = serializers.CharField(source='deliverer.user.get_full_name', read_only=True)
+
     class Meta:
         model = FinancialRecord
         fields = ['id', 'record_type', 'amount', 'description', 'runners_commission', 'created_at', 'related_delivery']
@@ -217,6 +222,41 @@ class DeliveryChatMessageSerializer(serializers.ModelSerializer):
         model = DeliveryChatMessage
         fields = ['id', 'delivery_request', 'sender', 'sender_name', 'recipient_role', 'message', 'created_at']
         read_only_fields = ['id', 'delivery_request', 'sender', 'sender_name', 'created_at']
+
+
+class DeliveryZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeliveryZone
+        fields = ['id', 'name', 'description', 'is_active']
+        read_only_fields = ['id']
+
+
+class DeliveryPricingRuleSerializer(serializers.ModelSerializer):
+    zone_name = serializers.CharField(source='zone.name', read_only=True)
+
+    class Meta:
+        model = DeliveryPricingRule
+        fields = [
+            'id', 'name', 'request_kind', 'zone', 'zone_name',
+            'min_items', 'max_items', 'min_points', 'max_points',
+            'fee_amount', 'priority', 'is_active'
+        ]
+        read_only_fields = ['id']
+
+
+class DeliveryCommerceHistorySerializer(serializers.ModelSerializer):
+    previous_commerce_name = serializers.CharField(source='previous_commerce.name', read_only=True)
+    new_commerce_name = serializers.CharField(source='new_commerce.name', read_only=True)
+    changed_by_name = serializers.CharField(source='changed_by.get_full_name', read_only=True)
+
+    class Meta:
+        model = DeliveryCommerceHistory
+        fields = [
+            'id', 'delivery_request', 'previous_commerce', 'previous_commerce_name',
+            'new_commerce', 'new_commerce_name', 'changed_by', 'changed_by_name',
+            'notes', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
 
 
 class DelivererListView(generics.ListAPIView):
@@ -316,6 +356,8 @@ class FinancialRecordListCreateView(generics.ListCreateAPIView):
         user = self.request.user
         if user.role == User.Role.ADMIN:
             deliverer_id = self.kwargs.get('deliverer_pk')
+            if not deliverer_id:
+                return FinancialRecord.objects.all()
             return FinancialRecord.objects.filter(deliverer_id=deliverer_id)
         try:
             deliverer = Deliverer.objects.get(user=user)
@@ -324,12 +366,52 @@ class FinancialRecordListCreateView(generics.ListCreateAPIView):
             return FinancialRecord.objects.none()
 
     def perform_create(self, serializer):
-        deliverer = Deliverer.objects.get(user=self.request.user)
-        # Calcular comisión de Runners
-        amount = serializer.validated_data.get('amount', 0)
-        commission_pct = float(SystemConfig.objects.filter(key='runners_commission_pct').values_list('value', flat=True).first() or 10)
-        runners_commission = amount * commission_pct / 100 if serializer.validated_data.get('record_type') == 'INGRESO' else 0
+        user = self.request.user
+        if user.role == User.Role.ADMIN and self.kwargs.get('deliverer_pk'):
+            deliverer = Deliverer.objects.get(pk=self.kwargs['deliverer_pk'])
+        else:
+            deliverer = Deliverer.objects.get(user=user)
+
+        amount = serializer.validated_data.get('amount', Decimal('0'))
+        reason = serializer.validated_data.get('reason')
+
+        runners_commission = Decimal('0')
+        if reason == FinancialRecord.Reason.RECARGO_TRANSFERENCIA:
+            runners_commission = amount
+
         serializer.save(deliverer=deliverer, runners_commission=runners_commission)
+
+
+class DeliveryZoneListCreateView(generics.ListCreateAPIView):
+    queryset = DeliveryZone.objects.filter(is_active=True)
+    serializer_class = DeliveryZoneSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [IsAdmin()]
+
+
+class DeliveryZoneDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = DeliveryZone.objects.all()
+    serializer_class = DeliveryZoneSerializer
+    permission_classes = [IsAdmin]
+
+
+class DeliveryPricingRuleListCreateView(generics.ListCreateAPIView):
+    queryset = DeliveryPricingRule.objects.filter(is_active=True)
+    serializer_class = DeliveryPricingRuleSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated()]
+        return [IsAdmin()]
+
+
+class DeliveryPricingRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = DeliveryPricingRule.objects.all()
+    serializer_class = DeliveryPricingRuleSerializer
+    permission_classes = [IsAdmin]
 
 
 class DeliveryRequestListCreateView(generics.ListCreateAPIView):
@@ -342,15 +424,22 @@ class DeliveryRequestListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        queryset = DeliveryRequest.objects.select_related(
+            'client', 'deliverer__user', 'commerce', 'zone', 'pricing_rule'
+        )
+
         if user.role == User.Role.ADMIN:
-            return DeliveryRequest.objects.all()
+            source_type = self.request.query_params.get('source_type')
+            if source_type:
+                queryset = queryset.filter(source_type=source_type)
+            return queryset
         if user.role == User.Role.DOMICILIARIO:
             try:
                 deliverer = Deliverer.objects.get(user=user)
-                return DeliveryRequest.objects.filter(deliverer=deliverer)
+                return queryset.filter(deliverer=deliverer)
             except Deliverer.DoesNotExist:
                 return DeliveryRequest.objects.none()
-        return DeliveryRequest.objects.filter(client=user)
+        return queryset.filter(client=user)
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -477,6 +566,59 @@ def my_deliverer_profile(request):
     payload['total_earnings'] = float(deliverer.current_balance)
     payload['completed_deliveries'] = completed_count
     return Response(payload)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdmin])
+def associate_delivery_commerce(request, pk):
+    try:
+        delivery = DeliveryRequest.objects.get(pk=pk)
+    except DeliveryRequest.DoesNotExist:
+        return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    commerce_id = request.data.get('commerce_id')
+    notes = request.data.get('notes', '')
+
+    if commerce_id in (None, ''):
+        new_commerce = None
+    else:
+        try:
+            new_commerce = Commerce.objects.get(pk=commerce_id)
+        except Commerce.DoesNotExist:
+            return Response({'error': 'Negocio no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+    previous = delivery.commerce
+
+    DeliveryCommerceHistory.objects.create(
+        delivery_request=delivery,
+        previous_commerce=previous,
+        new_commerce=new_commerce,
+        changed_by=request.user,
+        notes=notes,
+    )
+
+    delivery.commerce = new_commerce
+    delivery.associated_by = request.user
+    delivery.association_notes = notes
+    delivery.source_type = DeliveryRequest.SourceType.STORE if new_commerce else DeliveryRequest.SourceType.GENERAL
+    delivery.save(update_fields=['commerce', 'associated_by', 'association_notes', 'source_type', 'updated_at'])
+
+    return Response(DeliveryRequestSerializer(delivery).data)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def delivery_commerce_history(request, pk):
+    try:
+        delivery = DeliveryRequest.objects.get(pk=pk)
+    except DeliveryRequest.DoesNotExist:
+        return Response({'error': 'Solicitud no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.user.role != User.Role.ADMIN and delivery.client_id != request.user.id:
+        return Response({'error': 'Sin permiso para ver este historial.'}, status=status.HTTP_403_FORBIDDEN)
+
+    history = DeliveryCommerceHistory.objects.filter(delivery_request=delivery)
+    return Response(DeliveryCommerceHistorySerializer(history, many=True).data)
 
 
 @api_view(['POST'])

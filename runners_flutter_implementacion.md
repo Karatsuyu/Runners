@@ -4522,6 +4522,504 @@ mindmap
 
 ---
 
+## 🧱 Sprint 1 - Semana 1: Setup del proyecto
+
+| Tarea | Responsable | Horas | Pts | Etiqueta | Prioridad | Estado |
+|------|-------------|-------|-----|----------|-----------|--------|
+| Crear repo GitHub, estructura de carpetas, README | Laura (PM) | 4h | 0.5 | pm config | 🔴 Urgente | ✅ Hecho |
+| Inicializar proyecto Django + settings (base, dev, prod) | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+| Configurar `.env`, CORS, INSTALLED_APPS, SimpleJWT | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+| Inicializar proyecto React + Vite, configurar eslint | Alison (Frontend) | 4h | 0.5 | frontend config | 🔴 Urgente | ✅ Hecho |
+| Configurar Axios con interceptor de refresh token | Alison (Frontend) | 4h | 0.5 | frontend config | 🔴 Urgente | ✅ Hecho |
+| Crear tablero en ClickUp, definir columnas y etiquetas | Laura (PM) | 4h | 0.5 | pm | 🟠 Alta | ✅ Hecho |
+| Modelo User personalizado (AbstractBaseUser + roles) | Julian (Backend) | 8h | 1 | backend | 🔴 Urgente | ✅ Hecho |
+| Crear UserManager, migraciones, superuser | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+
+**Subtotal Semana 1:** 36h | 4.5 pts
+
+---
+
+## 📘 Historias de Usuario Detalladas (CA y DoD)
+
+> Esta sección complementa el backlog inicial sin modificarlo. Aquí quedan consolidadas las historias con sus criterios de aceptación y su Definition of Done para usarlas como base de implementación y seguimiento en ClickUp.
+
+### HU-01: Splash Screen con verificación de sesión
+**Descripción:** Como sistema, necesito mostrar una pantalla de carga inicial mientras verifico si el usuario ya posee un token válido guardado, para dirigirlo al Login o a su módulo correspondiente.
+**Puntos:** 1 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Al abrir la app, la pantalla Splash se muestra al menos por 1-2 segundos con el logo de Runners centrado correctamente.
+*   [ ] CA2: El sistema consulta `SecureStorage` para detectar la persistencia del `access_token` JWT.
+*   [ ] CA3: Si el token existe y es válido, se decodifica el rol para redirigir al dashboard correspondiente.
+*   [ ] CA4: Si el token ha expirado, se intenta renovar con `refresh_token` antes de expulsar al usuario.
+*   [ ] CA5: Si la validación falla, la app redirige a la ruta pública sin cerrar de forma inesperada.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas funcionales básicas realizadas con evidencia.
+*   [ ] Manejo de errores y estados vacíos visible al usuario.
+*   [ ] Persistencia y lectura de sesión verificada.
+*   [ ] Control de acceso por roles aplicado donde corresponda.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-02: Configuración Dio + interceptores JWT
+**Descripción:** Como desarrollador, necesito instanciar el cliente HTTP Dio con interceptores para inyectar el Bearer Token y refrescar la sesión automáticamente.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La instancia base de Dio agrega `Authorization: Bearer <token>` a las peticiones de la capa `/api/`.
+*   [ ] CA2: Ante un HTTP 401, el interceptor intenta renovar el `access_token` con el endpoint de refresh.
+*   [ ] CA3: Si la renovación es exitosa, la petición original se reintenta sin intervención del usuario.
+*   [ ] CA4: Si el refresh falla, se limpia la sesión y se fuerza cierre de sesión.
+*   [ ] CA5: Los logs no exponen tokens completos en entornos de producción.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de autenticación y refresh ejecutadas.
+*   [ ] Manejo de errores visible y controlado.
+*   [ ] Persistencia y renovación de sesión verificadas.
+*   [ ] Reglas de seguridad aplicadas en los encabezados y logs.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-03: SecureStorage para tokens
+**Descripción:** Como arquitecto Flutter, necesito guardar los tokens de sesión de forma segura en almacenamiento cifrado del dispositivo.
+**Puntos:** 1 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Los tokens `access` y `refresh` se guardan con `flutter_secure_storage`.
+*   [ ] CA2: La lectura de una clave inexistente devuelve `null` de forma controlada.
+*   [ ] CA3: El cierre de sesión elimina por completo las credenciales guardadas.
+*   [ ] CA4: La actualización del refresh token sobrescribe el valor anterior sin duplicados.
+*   [ ] CA5: No se almacenan tokens en texto plano ni en almacenamiento inseguro.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de persistencia segura realizadas.
+*   [ ] Manejo de errores y null-safety verificado.
+*   [ ] Seguridad de credenciales confirmada.
+*   [ ] Persistencia validada en el dispositivo o emulador.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-04: GoRouter con guards por rol
+**Descripción:** Como cliente/proveedor, el sistema debe bloquear rutas no autorizadas según el rol autenticado.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Las rutas usan `redirect` para evaluar el estado de autenticación.
+*   [ ] CA2: Un usuario sin rol Admin no puede entrar a rutas administrativas.
+*   [ ] CA3: Las rutas públicas de login y registro no están disponibles para usuarios autenticados.
+*   [ ] CA4: La navegación mantiene el shell o layout principal sin reinicios innecesarios.
+*   [ ] CA5: Las rutas inexistentes muestran una pantalla de error controlada.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de navegación y redirección realizadas.
+*   [ ] Manejo de errores y rutas inválidas implementado.
+*   [ ] Restricciones por rol verificadas.
+*   [ ] Persistencia de sesión respetada en la navegación.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-05: Pantalla Login
+**Descripción:** Como usuario, requiero una interfaz para autenticar mi cuenta usando mis credenciales.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla solicita correo y contraseña con validación de campos vacíos y formato correcto.
+*   [ ] CA2: El campo de contraseña permite mostrar u ocultar el texto ingresado.
+*   [ ] CA3: Un login correcto guarda la sesión y redirige al módulo correspondiente.
+*   [ ] CA4: Un login incorrecto muestra un mensaje claro de credenciales inválidas.
+*   [ ] CA5: Mientras la autenticación está en curso, el botón queda deshabilitado y muestra carga.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de formulario y autenticación realizadas.
+*   [ ] Manejo de errores visible al usuario.
+*   [ ] Persistencia de sesión validada.
+*   [ ] Control de acceso por rol verificado.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-06: Pantalla Registro de cliente
+**Descripción:** Como prospecto cliente, requiero registrarme con un formulario claro y validado.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario solicita los datos mínimos definidos para crear una cuenta.
+*   [ ] CA2: La confirmación de contraseña valida que ambos campos coincidan.
+*   [ ] CA3: Un registro exitoso crea el usuario y lo dirige al login.
+*   [ ] CA4: Si el correo ya existe, el sistema responde con un error amigable.
+*   [ ] CA5: El rol seleccionado se envía correctamente al backend según la opción escogida.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de registro realizadas con evidencia.
+*   [ ] Validaciones de formulario implementadas.
+*   [ ] Persistencia del usuario verificada en backend.
+*   [ ] Roles y reglas de negocio respetadas.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-07: Logout con limpieza de storage
+**Descripción:** Como usuario, quiero cerrar sesión limpiando por completo mis datos locales.
+**Puntos:** 1 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Al pulsar cerrar sesión se limpia el estado de autenticación.
+*   [ ] CA2: Los tokens guardados se eliminan del almacenamiento seguro.
+*   [ ] CA3: La app redirige a la vista pública o login sin regresar a la sesión anterior.
+*   [ ] CA4: Los datos temporales asociados al usuario se vacían.
+*   [ ] CA5: Si existe actividad en segundo plano, esta se detiene de forma controlada.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de cierre de sesión realizadas.
+*   [ ] Limpieza de credenciales y estado validada.
+*   [ ] Redirección controlada confirmada.
+*   [ ] Persistencia local vaciada correctamente.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-08: Navegación por rol (BottomNav diferenciado)
+**Descripción:** Como usuario segmentado, solo quiero ver las opciones de navegación permitidas para mi rol.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El cliente visualiza las secciones permitidas para su rol.
+*   [ ] CA2: El domiciliario visualiza solo sus paneles operativos.
+*   [ ] CA3: El prestador ve las opciones relacionadas con su flujo de trabajo.
+*   [ ] CA4: El administrador ve las opciones de gestión y métricas.
+*   [ ] CA5: La pestaña activa se resalta y no rompe el layout principal.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de navegación por rol realizadas.
+*   [ ] UI adaptada según perfil verificada.
+*   [ ] Restricciones de acceso confirmadas.
+*   [ ] Persistencia del rol respetada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-09: Pantalla Tienda con categorías y comercios
+**Descripción:** Como cliente, quiero explorar comercios por categorías para encontrar productos con rapidez.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla muestra categorías y comercios en un diseño claro y navegable.
+*   [ ] CA2: Al filtrar una categoría, la lista de comercios se actualiza correctamente.
+*   [ ] CA3: Si no hay comercios, se muestra un estado vacío amigable.
+*   [ ] CA4: Los comercios cerrados o inactivos se presentan con estado visual deshabilitado.
+*   [ ] CA5: La carga de datos maneja errores de red sin bloquear la pantalla.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de listado, filtro y estado vacío realizadas.
+*   [ ] Manejo de errores de red y carga validado.
+*   [ ] Persistencia y consulta de datos verificadas.
+*   [ ] Interacción por rol cliente confirmada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-10: Detalle de comercio con catálogo
+**Descripción:** Como cliente, quiero ver el detalle de un comercio con su catálogo de productos.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La vista muestra información del comercio y su catálogo asociado.
+*   [ ] CA2: Cada producto presenta imagen, nombre, precio y descripción.
+*   [ ] CA3: Los productos sin imagen muestran un placeholder seguro.
+*   [ ] CA4: Los productos sin stock no permiten añadirlos al carrito.
+*   [ ] CA5: La pantalla permite navegar entre comercio y productos sin perder contexto.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de detalle y catálogo realizadas.
+*   [ ] Estados de stock e imagen verificados.
+*   [ ] Persistencia de productos y comercio confirmada.
+*   [ ] Navegación y UX validadas.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-11: Carrito de compras (CartNotifier)
+**Descripción:** Como cliente, quiero mantener un carrito que acumule mis productos seleccionados.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Agregar productos incrementa cantidades y actualiza el total.
+*   [ ] CA2: El carrito impide mezclar productos de comercios distintos.
+*   [ ] CA3: Se puede aumentar, disminuir o eliminar productos desde la vista del carrito.
+*   [ ] CA4: El estado del carrito se conserva mientras la sesión esté activa.
+*   [ ] CA5: El total se calcula de forma precisa y visible antes de confirmar.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de carrito y totales realizadas.
+*   [ ] Reglas de negocio del carrito validadas.
+*   [ ] Persistencia temporal o en memoria verificada.
+*   [ ] Manejo de errores y estados vacíos incluido.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-12: Confirmación y creación de pedido
+**Descripción:** Como cliente, quiero confirmar mi carrito y crear el pedido en el backend.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El pedido se envía correctamente con los ítems y el total esperado.
+*   [ ] CA2: Al confirmar con éxito, el carrito se vacía.
+*   [ ] CA3: El sistema registra la trazabilidad del pedido en backend.
+*   [ ] CA4: Si hay un error de validación, se informa al usuario sin perder la selección.
+*   [ ] CA5: La app muestra confirmación visual del pedido creado.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de creación de pedido realizadas.
+*   [ ] Persistencia y trazabilidad verificadas.
+*   [ ] Manejo de errores funcional confirmado.
+*   [ ] Integración frontend-backend validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-13: Historial de pedidos del cliente
+**Descripción:** Como cliente, quiero revisar mis pedidos anteriores y su estado.
+**Puntos:** 3 | **Prioridad:** Media
+**Criterios de Aceptación:**
+*   [ ] CA1: El historial lista los pedidos del usuario autenticado.
+*   [ ] CA2: Cada pedido muestra estado, fecha y total.
+*   [ ] CA3: El detalle del pedido permite ver sus ítems asociados.
+*   [ ] CA4: Si no hay pedidos, se muestra un estado vacío claro.
+*   [ ] CA5: La recarga manual actualiza la información del listado.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de historial y detalle realizadas.
+*   [ ] Filtro por usuario autenticado confirmado.
+*   [ ] Estados vacíos y recarga validados.
+*   [ ] Persistencia histórica verificada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-14: Pantalla Servicios con categorías y prestadores
+**Descripción:** Como cliente, quiero buscar prestadores de servicios por categoría y disponibilidad.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla lista categorías de servicios y prestadores disponibles.
+*   [ ] CA2: El filtro por categoría actualiza los prestadores mostrados.
+*   [ ] CA3: Solo se muestran prestadores aprobados y activos.
+*   [ ] CA4: La búsqueda por texto ayuda a encontrar prestadores más rápido.
+*   [ ] CA5: Los errores de red se gestionan con feedback claro.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de listado, búsqueda y filtro realizadas.
+*   [ ] Reglas de aprobación y visibilidad confirmadas.
+*   [ ] Persistencia de servicios y categorías verificada.
+*   [ ] UX y estados de carga validados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-15: Detalle del prestador
+**Descripción:** Como cliente, quiero ver el detalle de un prestador antes de solicitar el servicio.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Se muestra la información principal del prestador y su categoría.
+*   [ ] CA2: La vista incluye imagen o avatar por defecto si no existe foto.
+*   [ ] CA3: El usuario puede abrir el flujo para solicitar el servicio desde aquí.
+*   [ ] CA4: Si el prestador está inactivo o no existe, se informa con claridad.
+*   [ ] CA5: La vista no pierde el contexto de navegación al regresar.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de detalle del prestador realizadas.
+*   [ ] Manejo de estados inexistentes o inactivos validado.
+*   [ ] Navegación de ida y vuelta confirmada.
+*   [ ] Persistencia de datos del prestador verificada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-16: Formulario de solicitud de servicio
+**Descripción:** Como cliente, quiero enviar una solicitud de servicio con datos claros y validados.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario solicita la información necesaria para generar la solicitud.
+*   [ ] CA2: Los campos obligatorios se validan antes de enviar.
+*   [ ] CA3: La solicitud se asocia al cliente autenticado y al prestador correcto.
+*   [ ] CA4: Si el envío falla, la app informa el motivo sin perder la información ingresada.
+*   [ ] CA5: Al guardar correctamente, el usuario recibe confirmación visual.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de formulario y envío realizadas.
+*   [ ] Asociación cliente-prestador verificada.
+*   [ ] Manejo de errores y validaciones implementado.
+*   [ ] Persistencia de solicitudes confirmada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-17: Registro como prestador (file_picker + upload)
+**Descripción:** Como ciudadano, quiero registrarme como prestador subiendo documentación de soporte.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario permite subir archivos de soporte en formatos permitidos.
+*   [ ] CA2: El tamaño del archivo se valida antes de enviarlo al servidor.
+*   [ ] CA3: El upload se realiza correctamente mediante multipart/form-data.
+*   [ ] CA4: El prestador queda pendiente de aprobación tras el registro.
+*   [ ] CA5: Un error de red o archivo inválido se comunica con un mensaje claro.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de carga de archivos realizadas.
+*   [ ] Validación de extensiones y tamaño confirmada.
+*   [ ] Persistencia de documentos y perfil verificada.
+*   [ ] Flujo de aprobación pendiente confirmado.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-18: Panel del prestador con cambio de estado
+**Descripción:** Como prestador, quiero ver mis solicitudes y cambiar mi estado operativo.
+**Puntos:** 3 | **Prioridad:** Media
+**Criterios de Aceptación:**
+*   [ ] CA1: El panel lista las solicitudes o actividades asignadas al prestador.
+*   [ ] CA2: El prestador puede aceptar o rechazar una solicitud según las reglas.
+*   [ ] CA3: El cambio de estado se refleja en la interfaz y en backend.
+*   [ ] CA4: Los usuarios sin rol autorizado no pueden modificar este estado.
+*   [ ] CA5: La vista muestra la información necesaria para operar con claridad.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de cambio de estado realizadas.
+*   [ ] Restricciones de rol verificadas.
+*   [ ] Persistencia del estado operativo confirmada.
+*   [ ] UX del panel validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-19: Pantalla Domicilios con lista de disponibles
+**Descripción:** Como domiciliario, quiero ver las solicitudes disponibles para tomar trabajo.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La vista muestra solicitudes disponibles y no asignadas.
+*   [ ] CA2: El domiciliario puede aceptar una solicitud disponible.
+*   [ ] CA3: Al aceptar, la solicitud cambia de estado y deja de mostrarse como disponible.
+*   [ ] CA4: Si la solicitud ya fue tomada, la app informa el conflicto de forma clara.
+*   [ ] CA5: La pantalla se actualiza para reflejar nuevos domicilios disponibles.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de aceptación de domicilios realizadas.
+*   [ ] Concurrencia y bloqueo de asignación confirmados.
+*   [ ] Persistencia de estado de entrega verificada.
+*   [ ] Actualización visual validada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-20: Panel financiero del domiciliario
+**Descripción:** Como domiciliario, quiero revisar mis ingresos, egresos y balance acumulado.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El panel muestra ingresos, egresos y balance total de forma clara.
+*   [ ] CA2: Los valores se calculan correctamente incluso si no hay movimientos.
+*   [ ] CA3: La vista permite consultar el detalle de los movimientos registrados.
+*   [ ] CA4: Los datos mostrados corresponden solo al domiciliario autenticado.
+*   [ ] CA5: La pantalla maneja estados vacíos y recarga manual.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de cálculos y balance realizadas.
+*   [ ] Filtrado por usuario autenticado validado.
+*   [ ] Persistencia de movimientos y balance verificada.
+*   [ ] UX financiera y estados vacíos confirmados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-21: Registro de ingresos y egresos
+**Descripción:** Como domiciliario, quiero registrar ingresos y egresos para controlar mis finanzas.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El formulario permite registrar ingresos y egresos con validación de valores.
+*   [ ] CA2: Los montos negativos o inválidos se rechazan con un mensaje claro.
+*   [ ] CA3: El balance se actualiza automáticamente después de guardar un movimiento.
+*   [ ] CA4: El registro queda asociado al domiciliario autenticado.
+*   [ ] CA5: Un fallo de conexión no borra la información ingresada por el usuario.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de creación de movimientos realizadas.
+*   [ ] Reglas de validación y cálculo confirmadas.
+*   [ ] Persistencia financiera verificada en backend.
+*   [ ] Control de acceso por rol validado.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-22: Directorio de contactos con buscador y filtros
+**Descripción:** Como usuario, quiero buscar contactos de interés con filtros simples.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: La pantalla muestra el directorio de contactos disponible.
+*   [ ] CA2: La búsqueda por nombre y filtro por categoría funcionan correctamente.
+*   [ ] CA3: Los contactos inactivos o eliminados no se muestran.
+*   [ ] CA4: Si no hay resultados, se muestra un estado vacío amigable.
+*   [ ] CA5: El contenido se actualiza al refrescar la vista.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de búsqueda y filtro realizadas.
+*   [ ] Estados vacíos y actualización confirmados.
+*   [ ] Persistencia del directorio verificada.
+*   [ ] Accesibilidad y UX revisadas.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-23: Llamada directa desde la app (url_launcher)
+**Descripción:** Como usuario, quiero llamar directamente a un contacto desde la aplicación.
+**Puntos:** 1 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: Al pulsar el contacto, la app abre el marcador telefónico del dispositivo.
+*   [ ] CA2: Antes de llamar, se verifica que el dispositivo soporte la acción.
+*   [ ] CA3: Si no se puede iniciar la llamada, se muestra un mensaje claro.
+*   [ ] CA4: La acción no interrumpe la navegación ni el estado de la app.
+*   [ ] CA5: La experiencia de usuario se mantiene simple y directa.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de lanzamiento de llamada realizadas.
+*   [ ] Manejo de dispositivos no compatibles validado.
+*   [ ] Integración con el sistema telefónico confirmada.
+*   [ ] UX y permisos revisados.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-24: Dashboard del admin (resumen y métricas)
+**Descripción:** Como administrador, quiero ver un panel con métricas generales del sistema.
+**Puntos:** 5 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El dashboard muestra conteos y métricas clave del sistema.
+*   [ ] CA2: Los datos se obtienen de endpoints protegidos por rol de administrador.
+*   [ ] CA3: Los valores se muestran correctamente incluso cuando no hay registros.
+*   [ ] CA4: La vista se adapta a diferentes tamaños de pantalla.
+*   [ ] CA5: Los errores de carga se comunican de forma clara.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de métricas y acceso realizadas.
+*   [ ] Restricciones de administrador verificadas.
+*   [ ] Persistencia de reportes y conteos confirmada.
+*   [ ] Adaptabilidad visual revisada.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+### HU-25: Aprobación/rechazo de prestadores desde admin
+**Descripción:** Como administrador, quiero aprobar o rechazar prestadores pendientes de validación.
+**Puntos:** 3 | **Prioridad:** Alta
+**Criterios de Aceptación:**
+*   [ ] CA1: El listado muestra solo prestadores pendientes de validación.
+*   [ ] CA2: El administrador puede aprobar un prestador y cambiar su estado a activo.
+*   [ ] CA3: El administrador puede rechazar un prestador y registrar el motivo si aplica.
+*   [ ] CA4: Los usuarios sin permisos no pueden ejecutar estas acciones.
+*   [ ] CA5: La decisión tomada se refleja en la vista y en la base de datos.
+**Definition of Done (DoD):**
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de aprobación y rechazo realizadas.
+*   [ ] Control de permisos verificado.
+*   [ ] Persistencia del estado del prestador confirmada.
+*   [ ] Estados de aprobación y rechazo auditables.
+*   [ ] Evidencia adjunta: capturas, video o demo.
+*   [ ] Documentación mínima actualizada.
+
+---
+
 ### Sprints — 4 Meses / 3 Desarrolladores
 
 ```
