@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/storage/secure_storage.dart';
 import '../../data/datasources/auth_remote_datasource.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/entities/user_entity.dart';
+import '../../../../core/errors/failures.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/auth_usecases.dart';
 
@@ -128,9 +130,117 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      // Comprobar conectividad primero; si no hay red, intentar fallback offline
+      try {
+        final conn = await Connectivity().checkConnectivity();
+        if (conn == ConnectivityResult.none) {
+          // Simular fallo de red para activar el fallback existente
+          final cachedEmail = await _secureStorage.getCachedUserEmail();
+          final cachedId = await _secureStorage.getCachedUserId();
+          final cachedRole = await _secureStorage.getCachedUserRole();
+          if (cachedEmail != null && cachedEmail == email) {
+            final role = UserRole.values.firstWhere(
+              (r) => r.name == (cachedRole ?? ''),
+              orElse: () => UserRole.CLIENTE,
+            );
+            final offlineUser = UserEntity(
+              id: cachedId ?? 0,
+              email: email,
+              username: null,
+              firstName: '',
+              lastName: '',
+              phone: null,
+              profileImageUrl: null,
+              role: role,
+              dateJoined: DateTime.now(),
+            );
+            state = state.copyWith(isLoading: false, user: offlineUser, isGuest: false);
+            return true;
+          }
+
+          final rememberedEmail = await _secureStorage.getRememberedEmail();
+          final rememberedPassword = await _secureStorage.getRememberedPassword();
+          if (rememberedEmail != null && rememberedPassword != null && rememberedEmail == email) {
+            final offlineUser = UserEntity(
+              id: 0,
+              email: rememberedEmail,
+              username: null,
+              firstName: '',
+              lastName: '',
+              phone: null,
+              profileImageUrl: null,
+              role: UserRole.CLIENTE,
+              dateJoined: DateTime.now(),
+            );
+            state = state.copyWith(isLoading: false, user: offlineUser, isGuest: false);
+            return true;
+          }
+          state = state.copyWith(isLoading: false, error: 'Sin conexión a internet. Verifica tu red.');
+          return false;
+        }
+      } catch (_) {
+        // Si la comprobación de conectividad falla, continuar con intento remoto
+      }
       final result = await _loginUseCase(email, password);
       return await result.fold(
         (failure) async {
+          // Si hay fallo de red, intentar fallback offline usando credenciales cacheadas o recordadas
+          if (failure is NetworkFailure) {
+            try {
+              // Preferir perfil cacheado (guardado tras login remoto previo)
+              final cachedEmail = await _secureStorage.getCachedUserEmail();
+              final cachedId = await _secureStorage.getCachedUserId();
+              final cachedRole = await _secureStorage.getCachedUserRole();
+
+              if (cachedEmail != null && cachedEmail == email) {
+                final role = UserRole.values.firstWhere(
+                  (r) => r.name == (cachedRole ?? ''),
+                  orElse: () => UserRole.CLIENTE,
+                );
+                final offlineUser = UserEntity(
+                  id: cachedId ?? 0,
+                  email: email,
+                  username: null,
+                  firstName: '',
+                  lastName: '',
+                  phone: null,
+                  profileImageUrl: null,
+                  role: role,
+                  dateJoined: DateTime.now(),
+                );
+                state = state.copyWith(isLoading: false, user: offlineUser, isGuest: false);
+                return true;
+              }
+
+              // Si no hay perfil cacheado, intentar con credenciales "Recordarme"
+              final rememberedEmail = await _secureStorage.getRememberedEmail();
+              final rememberedPassword = await _secureStorage.getRememberedPassword();
+
+              if (rememberedEmail != null && rememberedPassword != null) {
+                // Si el usuario hizo match con el email ingresado o no ingresó nada distinto,
+                // permitimos iniciar sesión offline usando el usuario recordado.
+                if (rememberedEmail == email) {
+                  final role = UserRole.CLIENTE;
+                  final offlineUser = UserEntity(
+                    id: 0,
+                    email: rememberedEmail,
+                    username: null,
+                    firstName: '',
+                    lastName: '',
+                    phone: null,
+                    profileImageUrl: null,
+                    role: role,
+                    dateJoined: DateTime.now(),
+                  );
+                  state = state.copyWith(isLoading: false, user: offlineUser, isGuest: false);
+                  return true;
+                }
+              }
+            } catch (_) {
+              // Ignorar errores de storage en fallback
+            }
+          }
+
           state = state.copyWith(isLoading: false, error: failure.message);
           return false;
         },

@@ -24,6 +24,14 @@ class AuthRepositoryImpl implements AuthRepository {
         refreshToken: data['refresh'] as String,
       );
       final profile = await _remoteDataSource.getProfile();
+      // Guardar perfil mínimo en storage para permitir login offline
+      try {
+        await _storage.saveCachedUser(
+          id: profile.id,
+          role: profile.role,
+          email: profile.email,
+        );
+      } catch (_) {}
       return Right(profile.toEntity());
     } on NetworkException catch (e) {
       return Left(NetworkFailure(message: e.message));
@@ -47,6 +55,14 @@ class AuthRepositoryImpl implements AuthRepository {
         refreshToken: tokens['refresh'] as String,
       );
       final profile = await _remoteDataSource.getProfile();
+      // Guardar perfil mínimo en storage para permitir login offline
+      try {
+        await _storage.saveCachedUser(
+          id: profile.id,
+          role: profile.role,
+          email: profile.email,
+        );
+      } catch (_) {}
       return Right(profile.toEntity());
     } on NetworkException catch (e) {
       return Left(NetworkFailure(message: e.message));

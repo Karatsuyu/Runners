@@ -110,6 +110,7 @@ class SecureStorageService {
       await _storage.delete(key: StorageKeys.refreshToken).timeout(_ioTimeout);
       await _storage.delete(key: StorageKeys.userRole).timeout(_ioTimeout);
       await _storage.delete(key: StorageKeys.userId).timeout(_ioTimeout);
+      await _storage.delete(key: StorageKeys.userEmail).timeout(_ioTimeout);
     } catch (_) {
       // Ignored intentionally; session cleanup is best-effort.
     }
@@ -118,5 +119,42 @@ class SecureStorageService {
   Future<bool> hasValidSession() async {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
+  }
+
+  // Cached user profile helpers (minimal)
+  Future<void> saveCachedUser({required int id, required String role, required String email}) async {
+    try {
+      await _storage.write(key: StorageKeys.userId, value: id.toString()).timeout(_ioTimeout);
+      await _storage.write(key: StorageKeys.userRole, value: role).timeout(_ioTimeout);
+      await _storage.write(key: StorageKeys.userEmail, value: email).timeout(_ioTimeout);
+    } catch (_) {
+      // ignore
+    }
+  }
+
+  Future<int?> getCachedUserId() async {
+    try {
+      final v = await _storage.read(key: StorageKeys.userId).timeout(_ioTimeout);
+      if (v == null) return null;
+      return int.tryParse(v);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> getCachedUserRole() async {
+    try {
+      return await _storage.read(key: StorageKeys.userRole).timeout(_ioTimeout);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> getCachedUserEmail() async {
+    try {
+      return await _storage.read(key: StorageKeys.userEmail).timeout(_ioTimeout);
+    } catch (_) {
+      return null;
+    }
   }
 }

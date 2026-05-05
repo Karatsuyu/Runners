@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/errors/exceptions.dart';
 
 // ── Models inline simples (sin code generation) ────────────────────────────
 
@@ -151,47 +152,81 @@ class StoreDataSource {
   StoreDataSource(this._dio);
 
   Future<List<CategoryModel>> getCategories() async {
-    final r = await _dio.get('/store/categories/');
-    final list =
-        (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
-    return list
-        .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final r = await _dio.get('/store/categories/');
+      final list =
+          (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
+      return list
+          .map((e) => CategoryModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
   }
 
   Future<List<CommerceModel>> getCommerces({int? categoryId}) async {
-    final r = await _dio.get(
-      '/store/commerces/',
-      queryParameters: categoryId != null ? {'category': categoryId} : null,
-    );
-    final list =
-        (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
-    return list
-        .map((e) => CommerceModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final r = await _dio.get(
+        '/store/commerces/',
+        queryParameters: categoryId != null ? {'category': categoryId} : null,
+      );
+      final list =
+          (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
+      return list
+          .map((e) => CommerceModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
   }
 
   Future<List<ProductModel>> getProducts(int commerceId) async {
-    final r = await _dio.get('/store/commerces/$commerceId/products/');
-    final list =
-        (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
-    return list
-        .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final r = await _dio.get('/store/commerces/$commerceId/products/');
+      final list =
+          (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
+      return list
+          .map((e) => ProductModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
   }
 
   Future<OrderModel> createOrder(Map<String, dynamic> data) async {
-    final r = await _dio.post('/store/orders/create/', data: data);
-    return OrderModel.fromJson(r.data as Map<String, dynamic>);
+    try {
+      final r = await _dio.post('/store/orders/create/', data: data);
+      return OrderModel.fromJson(r.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
   }
 
   Future<List<OrderModel>> getOrders() async {
-    final r = await _dio.get('/store/orders/');
-    final list =
-        (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
-    return list
-        .map((e) => OrderModel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    try {
+      final r = await _dio.get('/store/orders/');
+      final list =
+          (r.data as Map<String, dynamic>)['results'] as List? ?? r.data as List;
+      return list
+          .map((e) => OrderModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Exception _handleError(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.unknown ||
+        e.type == DioExceptionType.connectionError) {
+      return NetworkException();
+    }
+    // Fallback to a generic server exception with backend message when available
+    return ServerException(
+      message: e.response?.data.toString() ?? 'Error del servidor',
+      statusCode: e.response?.statusCode,
+    );
   }
 }
 

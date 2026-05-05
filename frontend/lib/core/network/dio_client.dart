@@ -15,6 +15,12 @@ class DioClient {
         headers: {'Content-Type': 'application/json'},
       ),
     );
+    // Debug: show which baseUrl the app is using at startup
+    // (quitar o comentar en producción)
+    try {
+      // ignore: avoid_print
+      print('DioClient: using baseUrl=${ApiConstants.baseUrl}');
+    } catch (_) {}
     _addInterceptors();
   }
 
@@ -27,6 +33,11 @@ class DioClient {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
+          // Debug: print outgoing request URL
+          try {
+            // ignore: avoid_print
+            print('DioClient: request ${options.method} ${options.baseUrl}${options.path}');
+          } catch (_) {}
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
@@ -47,6 +58,8 @@ class DioClient {
         },
       ),
     );
+    // Add simple log interceptor to show responses for debugging
+    _dio.interceptors.add(LogInterceptor(requestBody: false, responseBody: false, requestHeader: false, responseHeader: false));
   }
 
   Future<bool> _refreshToken() async {
