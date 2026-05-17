@@ -170,6 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final dioBase = ref.read(dioClientProvider).dio.options.baseUrl;
     final width = MediaQuery.of(context).size.width;
     final isCompact = width < 600;
 
@@ -347,6 +348,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 8),
+                            // Debug backend info removed from UI
                             TextButton(
                               style: linkStyle,
                               onPressed: () {

@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../shared/widgets/pdf_thumbnail.dart';
+import '../../../../shared/widgets/pdf_viewer_screen.dart';
+import '../../../../shared/widgets/image_viewer_screen.dart';
 import '../providers/store_provider.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_error_widget.dart';
@@ -12,6 +15,7 @@ import '../../../../core/router/app_routes.dart';
 import '../../../../core/utils/media_url.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../auth/domain/entities/user_entity.dart';
+import '../../../../core/theme/theme_mode_provider.dart';
 
 void _redirectGuestToLogin(BuildContext context) {
   ScaffoldMessenger.of(context).showSnackBar(
@@ -57,11 +61,23 @@ class StoreScreen extends ConsumerWidget {
     );
   }
 
-  void _openMenu(BuildContext context, String? menuUrl) {
+  void _openMenu(BuildContext context, String? menuUrl, {String? assetCover}) {
     final resolvedUrl = resolveMediaUrl(menuUrl);
     if (resolvedUrl == null) return;
-    
-    // Open URLs in app for PDFs and images
+
+    final lower = resolvedUrl.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => PdfViewerScreen(url: resolvedUrl, assetCover: assetCover)));
+      return;
+    }
+
+    // If the menu is an image, open inside the app using ImageViewerScreen
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: resolvedUrl)));
+      return;
+    }
+
+    // Fallback: open in-app webview for other types
     launchUrl(
       Uri.parse(resolvedUrl),
       mode: LaunchMode.inAppWebView,
@@ -75,6 +91,9 @@ class StoreScreen extends ConsumerWidget {
     }
 
     final isImage = _isImageMenu(menuUrl);
+    // For "La Casa del Chorizo" we have a local cover asset (user will add image to assets/menus/)
+    final isCasaDelChorizo = commerce.name.toLowerCase().contains('chorizo') || commerce.name.toLowerCase().contains('casa del chorizo');
+    final coverAsset = isCasaDelChorizo ? 'assets/menus/CARTA_DE_LA_ESQUINA_DEL_CHORIZO_2.jpg' : null;
 
     return Container(
       margin: const EdgeInsets.only(top: 10),
@@ -104,37 +123,44 @@ class StoreScreen extends ConsumerWidget {
                 ),
               ),
               TextButton(
-                onPressed: () => _openMenu(context, commerce.menuPdf),
-                child: const Text('Abrir'),
+                onPressed: () => _openMenu(context, commerce.menuPdf, assetCover: coverAsset),
+                child: const Text('Ver carta'),
               ),
             ],
           ),
           if (isImage)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: ClipRRect(
+              child: InkWell(
+                onTap: () => _openMenu(context, commerce.menuPdf, assetCover: coverAsset),
                 borderRadius: BorderRadius.circular(10),
-                child: Image.network(
-                  menuUrl,
-                  width: double.infinity,
-                  height: 180,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(
+                    menuUrl,
+                    width: double.infinity,
                     height: 180,
-                    child: Center(child: Text('No se pudo cargar la carta')),
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 180,
+                      child: Center(child: Text('No se pudo cargar la carta')),
+                    ),
                   ),
                 ),
               ),
             )
           else
             Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'La carta está en PDF y se abre con un toque.',
-                style: TextStyle(
-                  color: AppColors.textSecondary.withValues(alpha: 0.95),
-                  fontSize: 12,
-                ),
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InkWell(
+                    onTap: () => _openMenu(context, commerce.menuPdf, assetCover: coverAsset),
+                    borderRadius: BorderRadius.circular(10),
+                    child: PdfThumbnail(url: menuUrl, height: 180),
+                  ),
+                ],
               ),
             ),
         ],
@@ -187,6 +213,27 @@ class StoreScreen extends ConsumerWidget {
                       if (context.mounted) {
                         context.push(AppRoutes.clientProfile);
                       }
+                    },
+                  ),
+                // Theme toggle between Edit profile and Logout
+                if (!isGuest)
+                  Consumer(
+                    builder: (c, r, _) {
+                      final mode = r.watch(themeModeProvider);
+                      final isDark = mode == ThemeMode.dark;
+                      return ListTile(
+                        leading: const Icon(Icons.brightness_6_outlined),
+                        title: const Text('Cambiar tema'),
+                        trailing: Switch.adaptive(
+                          value: isDark,
+                          onChanged: (v) async {
+                            await r.read(themeModeProvider.notifier).toggle();
+                          },
+                        ),
+                        onTap: () async {
+                          await r.read(themeModeProvider.notifier).toggle();
+                        },
+                      );
                     },
                   ),
                 ListTile(
@@ -532,18 +579,18 @@ class StoreScreen extends ConsumerWidget {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryGreen,
-        onPressed: () {
-          if (isGuest) {
-            _redirectGuestToLogin(context);
-            return;
-          }
-          context.go('/client/orders');
-        },
-        icon: const Icon(Icons.history, color: Colors.white),
-        label: const Text('Mis Pedidos', style: TextStyle(color: Colors.white)),
-      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   backgroundColor: AppColors.primaryGreen,
+      //   onPressed: () {
+      //     if (isGuest) {
+      //       _redirectGuestToLogin(context);
+      //       return;
+      //     }
+      //     context.go('/client/orders');
+      //   },
+      //   icon: const Icon(Icons.history, color: Colors.white),
+      //   label: const Text('Mis Pedidos', style: TextStyle(color: Colors.white)),
+      // ),
     );
   }
 }
@@ -553,9 +600,20 @@ class CommerceDetailScreen extends ConsumerWidget {
   final int commerceId;
   const CommerceDetailScreen({super.key, required this.commerceId});
 
-  Future<void> _openMenu(String url) async {
+  Future<void> _openMenu(BuildContext context, String url) async {
+    final lower = url.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => PdfViewerScreen(url: url)));
+      return;
+    }
+
+    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.png') || lower.endsWith('.webp')) {
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ImageViewerScreen(imageUrl: url)));
+      return;
+    }
+
     final uri = Uri.parse(url);
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await launchUrl(uri, mode: LaunchMode.inAppWebView);
   }
 
   bool _isImageUrl(String url) {
@@ -585,15 +643,19 @@ class CommerceDetailScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             if (isImage)
-              ClipRRect(
+              InkWell(
+                onTap: () => _openMenu(context, menuUrl),
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  menuUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (_, __, ___) => const SizedBox(
-                    height: 140,
-                    child: Center(child: Text('No se pudo cargar la carta')),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    menuUrl,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 140,
+                      child: Center(child: Text('No se pudo cargar la carta')),
+                    ),
                   ),
                 ),
               )
@@ -623,7 +685,7 @@ class CommerceDetailScreen extends ConsumerWidget {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => _openMenu(menuUrl),
+                      onPressed: () => _openMenu(context, menuUrl),
                       child: const Text('Ver carta'),
                     ),
                   ],

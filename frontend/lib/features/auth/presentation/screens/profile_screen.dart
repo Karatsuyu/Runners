@@ -5,8 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/router/app_routes.dart';
+// Theme-driven colors used instead of AppColors
 import '../../../../core/utils/media_url.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
@@ -104,8 +103,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Mi perfil'),
-          backgroundColor: AppColors.primaryGreen,
-          foregroundColor: Colors.white,
+          backgroundColor: Theme.of(context).appBarTheme.backgroundColor ?? Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).appBarTheme.foregroundColor ?? Theme.of(context).colorScheme.onPrimary,
         ),
         body: const Center(child: Text('No hay sesión activa.')),
       );
@@ -118,11 +117,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           : null);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Mi perfil'),
-        backgroundColor: AppColors.primaryGreen,
-        foregroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor ?? Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).appBarTheme.foregroundColor ?? Theme.of(context).colorScheme.onPrimary,
         actions: [
           IconButton(
             tooltip: 'Guardar',
@@ -143,13 +142,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 56,
-                      backgroundColor: Colors.grey.shade200,
+                      backgroundColor: Theme.of(context).colorScheme.surface,
                       backgroundImage: imageProvider,
                       child: imageProvider == null
-                          ? const Icon(
+                          ? Icon(
                               Icons.person,
                               size: 58,
-                              color: AppColors.primaryGreen,
+                              color: Theme.of(context).colorScheme.primary,
                             )
                           : null,
                     ),
@@ -161,13 +160,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         child: Container(
                           width: 34,
                           height: 34,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primaryGreen,
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.camera_alt_outlined,
-                            color: Colors.white,
+                            color: Theme.of(context).colorScheme.onPrimary,
                             size: 18,
                           ),
                         ),
@@ -227,8 +226,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: ElevatedButton.icon(
                   onPressed: authState.isLoading ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryGreen,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                   ),
                   icon: authState.isLoading
                       ? const SizedBox(

@@ -25,6 +25,5 @@ Future<void> main() async {
 
   // Notificaciones locales
   await NotificationsService.init();
-
   runApp(const ProviderScope(child: RunnersApp()));
 }

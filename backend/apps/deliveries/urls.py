@@ -13,6 +13,7 @@ urlpatterns = [
     path('zones/<int:pk>/', views.DeliveryZoneDetailView.as_view(), name='delivery_zone_detail'),
     path('pricing-rules/', views.DeliveryPricingRuleListCreateView.as_view(), name='delivery_pricing_rule_list_create'),
     path('pricing-rules/<int:pk>/', views.DeliveryPricingRuleDetailView.as_view(), name='delivery_pricing_rule_detail'),
+    path('estimate/', views.estimate_delivery_fee, name='delivery_estimate'),
     path('requests/', views.DeliveryRequestListCreateView.as_view(), name='delivery_request_list_create'),
     path('requests/create/', views.DeliveryRequestListCreateView.as_view(), name='delivery_request_create'),
     path('requests/my-deliveries/', views.DeliveryRequestListCreateView.as_view(), name='my_deliveries'),

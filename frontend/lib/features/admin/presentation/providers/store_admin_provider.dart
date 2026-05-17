@@ -17,6 +17,7 @@ class AdminCommerceModel {
   final String address;
   final String? image;
   final String? menuPdf;
+  final List<Map<String, dynamic>>? menuFiles;
   final bool isActive;
   final String createdAt;
   final String updatedAt;
@@ -31,6 +32,7 @@ class AdminCommerceModel {
     required this.address,
     this.image,
     this.menuPdf,
+    this.menuFiles,
     required this.isActive,
     required this.createdAt,
     required this.updatedAt,
@@ -47,6 +49,7 @@ class AdminCommerceModel {
       address: json['address'] as String? ?? '',
       image: json['image'] as String?,
       menuPdf: json['menu_pdf'] as String?,
+      menuFiles: (json['menu_files'] as List?)?.map((e) => e as Map<String, dynamic>).toList(),
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] as String? ?? '',
       updatedAt: json['updated_at'] as String? ?? '',
@@ -105,10 +108,44 @@ class AdminStoreDataSource {
 
   Future<AdminCommerceModel> getCommerceDetail(int id) async {
     try {
-      final response = await _dio.get('${ApiConstants.manageCommerces}$id/');
+      // Use public commerce detail endpoint for GET so it includes `menu_files`.
+      final response = await _dio.get(ApiConstants.commerceDetail(id));
       return AdminCommerceModel.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
       rethrow;
+    }
+  }
+
+  // Menu files
+  Future<List<Map<String, dynamic>>> getMenuFiles(int commerceId) async {
+    final response = await _dio.get('${ApiConstants.commerces}$commerceId/menus/');
+    final data = response.data as List<dynamic>;
+    return data.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<Map<String, dynamic>> uploadMenuFile(int commerceId, String filePath) async {
+    try {
+      final inferredName = filePath.split(RegExp(r'[\\/]')).last;
+      final form = FormData.fromMap({
+        'file': await MultipartFile.fromFile(filePath, filename: inferredName),
+      });
+      final response = await _dio.post('${ApiConstants.commerces}$commerceId/menus/', data: form);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (err) {
+      // If the server returned a response body (validation errors), surface it
+      final serverMessage = err.response?.data ?? err.message;
+      throw Exception('Upload failed: $serverMessage');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMenuFile(int commerceId, int fileId) async {
+    try {
+      await _dio.delete('${ApiConstants.commerces}$commerceId/menus/$fileId/');
+    } on DioException catch (err) {
+      final serverMessage = err.response?.data ?? err.message;
+      throw Exception('Delete failed: $serverMessage');
     }
   }
 
@@ -124,12 +161,15 @@ class AdminStoreDataSource {
     }
   }
 
-  Future<AdminCommerceModel> updateCommerce(int id, FormData data) async {
+  Future<AdminCommerceModel> updateCommerce(int id, dynamic data) async {
     try {
-      final response = await _dio.put(
-        '${ApiConstants.manageCommerces}$id/',
-        data: data,
-      );
+      // Use PATCH for partial JSON updates (e.g., clearing menu_pdf). Use PUT when sending FormData.
+      late Response response;
+      if (data is FormData) {
+        response = await _dio.put('${ApiConstants.manageCommerces}$id/', data: data);
+      } else {
+        response = await _dio.patch('${ApiConstants.manageCommerces}$id/', data: data);
+      }
       return AdminCommerceModel.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
       rethrow;
@@ -159,6 +199,20 @@ class AdminStoreCategoryDataSource {
         .map((e) => AdminCategoryModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<AdminCategoryModel> createCategory(String name) async {
+    final response = await _dio.post(ApiConstants.categories, data: {'name': name});
+    return AdminCategoryModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AdminCategoryModel> updateCategory(int id, String name) async {
+    final response = await _dio.put('${ApiConstants.categories}$id/', data: {'name': name});
+    return AdminCategoryModel.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteCategory(int id) async {
+    await _dio.delete('${ApiConstants.categories}$id/');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,12 +239,47 @@ class AdminStoreRepository {
     return _dataSource.createCommerce(data);
   }
 
-  Future<AdminCommerceModel> updateCommerce(int id, FormData data) async {
+  Future<AdminCommerceModel> updateCommerce(int id, dynamic data) async {
     return _dataSource.updateCommerce(id, data);
   }
 
   Future<void> deleteCommerce(int id) async {
     return _dataSource.deleteCommerce(id);
+  }
+
+  // Menu files passthrough
+  Future<List<Map<String, dynamic>>> getMenuFiles(int commerceId) async {
+    return _dataSource.getMenuFiles(commerceId);
+  }
+
+  Future<Map<String, dynamic>> uploadMenuFile(int commerceId, String filePath) async {
+    return _dataSource.uploadMenuFile(commerceId, filePath);
+  }
+
+  Future<void> deleteMenuFile(int commerceId, int fileId) async {
+    return _dataSource.deleteMenuFile(commerceId, fileId);
+  }
+}
+
+class AdminStoreCategoryRepository {
+  final AdminStoreCategoryDataSource _dataSource;
+
+  AdminStoreCategoryRepository(this._dataSource);
+
+  Future<List<AdminCategoryModel>> getCategories() async {
+    return _dataSource.getCategories();
+  }
+
+  Future<AdminCategoryModel> createCategory(String name) async {
+    return _dataSource.createCategory(name);
+  }
+
+  Future<AdminCategoryModel> updateCategory(int id, String name) async {
+    return _dataSource.updateCategory(id, name);
+  }
+
+  Future<void> deleteCategory(int id) async {
+    return _dataSource.deleteCategory(id);
   }
 }
 
@@ -207,6 +296,12 @@ final adminStoreCategoryDataSourceProvider =
     Provider<AdminStoreCategoryDataSource>((ref) {
   final dio = ref.read(dioClientProvider).dio;
   return AdminStoreCategoryDataSource(dio);
+});
+
+final adminStoreCategoryRepositoryProvider =
+    Provider<AdminStoreCategoryRepository>((ref) {
+  final dataSource = ref.read(adminStoreCategoryDataSourceProvider);
+  return AdminStoreCategoryRepository(dataSource);
 });
 
 final storeAdminProvider = Provider<AdminStoreRepository>((ref) {

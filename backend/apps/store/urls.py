@@ -17,6 +17,9 @@ urlpatterns = [
     # Productos (anidados por comercio)
     path('commerces/<int:commerce_pk>/products/', views.ProductListView.as_view(), name='product_list'),
     path('products/<int:pk>/', views.ProductDetailView.as_view(), name='product_detail'),
+    # Menús / cartas: listar, subir y eliminar archivos (imagenes o PDF)
+    path('commerces/<int:commerce_pk>/menus/', views.CommerceMenuFileListCreateView.as_view(), name='commerce_menu_list_create'),
+    path('commerces/<int:commerce_pk>/menus/<int:pk>/', views.CommerceMenuFileDetailView.as_view(), name='commerce_menu_detail'),
 
     # Pedidos
     path('orders/', views.OrderListView.as_view(), name='order_list'),

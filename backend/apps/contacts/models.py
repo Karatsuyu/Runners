@@ -1,5 +1,6 @@
 from django.db import models
 from apps.users.models import User
+from apps.services.models import ServiceCategory
 
 
 class Contact(models.Model):
@@ -22,6 +23,13 @@ class Contact(models.Model):
     image = models.ImageField(upload_to='contacts/', blank=True, null=True)
     description = models.TextField(blank=True)
     contact_type = models.CharField(max_length=20, choices=ContactType.choices, default=ContactType.PROFESIONAL)
+    category = models.ForeignKey(
+        ServiceCategory,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name='contacts',
+    )
     is_active = models.BooleanField(default=True)
     owner = models.ForeignKey(
         User,

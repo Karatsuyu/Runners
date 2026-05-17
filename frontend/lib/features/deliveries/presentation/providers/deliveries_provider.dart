@@ -74,6 +74,8 @@ class DeliveryRequestModel {
   final double? expenses;
   final String createdAt;
   final String? completedAt;
+  final int? zoneId;
+  final double? zoneFee;
 
   const DeliveryRequestModel({
     required this.id,
@@ -91,6 +93,8 @@ class DeliveryRequestModel {
     this.expenses,
     required this.createdAt,
     this.completedAt,
+    this.zoneId,
+    this.zoneFee,
   });
 
   factory DeliveryRequestModel.fromJson(Map<String, dynamic> j) {
@@ -129,6 +133,8 @@ class DeliveryRequestModel {
         expenses: (j['expenses'] as num?)?.toDouble(),
         createdAt: j['created_at'] as String? ?? '',
         completedAt: j['completed_at'] as String?,
+        zoneId: j['zone'] as int?,
+        zoneFee: (j['zone_fee'] as num?)?.toDouble(),
       );
   }
 
@@ -214,6 +220,12 @@ class DeliveriesDataSource {
     required String pickupAddress,
     required String deliveryAddress,
     required String description,
+    String? requestKind,
+    int? itemsCount,
+    int? pointsCount,
+    bool? isTransferPayment,
+    double? productAmount,
+    int? zone,
   }) async {
     final res = await _dio.post(
       ApiConstants.createDeliveryRequest,
@@ -221,9 +233,38 @@ class DeliveriesDataSource {
         'pickup_address': pickupAddress,
         'delivery_address': deliveryAddress,
         'description': description,
+        if (requestKind != null) 'request_kind': requestKind,
+        if (itemsCount != null) 'items_count': itemsCount,
+        if (pointsCount != null) 'points_count': pointsCount,
+        if (isTransferPayment != null) 'is_transfer_payment': isTransferPayment,
+        if (productAmount != null) 'product_amount': productAmount,
+        if (zone != null) 'zone': zone,
       },
     );
     return DeliveryRequestModel.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// Estimate delivery fee using backend rules
+  Future<Map<String, dynamic>> estimateDeliveryFee({
+    required String requestKind,
+    int? zone,
+    int? itemsCount,
+    int? pointsCount,
+    double? productAmount,
+    bool? isTransferPayment,
+  }) async {
+    final res = await _dio.post(
+      ApiConstants.deliveryEstimate,
+      data: {
+        'request_kind': requestKind,
+        if (zone != null) 'zone': zone,
+        if (itemsCount != null) 'items_count': itemsCount,
+        if (pointsCount != null) 'points_count': pointsCount,
+        if (productAmount != null) 'product_amount': productAmount,
+        if (isTransferPayment != null) 'is_transfer_payment': isTransferPayment,
+      },
+    );
+    return res.data as Map<String, dynamic>;
   }
 
   /// CLIENT: list my delivery requests

@@ -15,7 +15,7 @@ from .models import (
 )
 from apps.users.permissions import IsAdmin, IsDomiciliario
 from apps.users.models import User
-from django.db import transaction
+from django.db import transaction, models
 
 
 # ── Serializers ──────────────────────────────────────────────────────────────
@@ -194,10 +194,18 @@ class DeliveryRequestSerializer(serializers.ModelSerializer):
 
 class DeliveryRequestCreateSerializer(serializers.ModelSerializer):
     order_id = serializers.IntegerField(required=False, allow_null=True)
+    request_kind = serializers.ChoiceField(choices=DeliveryRequest.RequestKind.choices, required=False)
+    items_count = serializers.IntegerField(required=False, default=1)
+    points_count = serializers.IntegerField(required=False, default=1)
+    is_transfer_payment = serializers.BooleanField(required=False, default=False)
+    product_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=Decimal('0'))
 
     class Meta:
         model = DeliveryRequest
-        fields = ['description', 'pickup_address', 'delivery_address', 'order_id']
+        fields = [
+            'description', 'pickup_address', 'delivery_address', 'order_id',
+            'request_kind', 'items_count', 'points_count', 'is_transfer_payment', 'product_amount'
+        ]
 
 
 class DeliveryApprovalSerializer(serializers.Serializer):
@@ -414,6 +422,77 @@ class DeliveryPricingRuleDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdmin]
 
 
+class DeliveryEstimateSerializer(serializers.Serializer):
+    request_kind = serializers.ChoiceField(choices=DeliveryRequest.RequestKind.choices)
+    zone = serializers.IntegerField(required=False, allow_null=True)
+    items_count = serializers.IntegerField(required=False, default=1)
+    points_count = serializers.IntegerField(required=False, default=1)
+    product_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, default=Decimal('0'))
+    is_transfer_payment = serializers.BooleanField(required=False, default=False)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def estimate_delivery_fee(request):
+    """Estima la tarifa de un domicilio según reglas y posibles recargos."""
+    serializer = DeliveryEstimateSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    request_kind = data.get('request_kind')
+    zone_id = data.get('zone')
+    items = data.get('items_count') or 1
+    points = data.get('points_count') or 1
+    product_amount = data.get('product_amount') or Decimal('0')
+    is_transfer = data.get('is_transfer_payment')
+
+    # Filtrar reglas aplicables
+    rules = DeliveryPricingRule.objects.filter(request_kind=request_kind, is_active=True).order_by('priority', 'id')
+    if zone_id:
+        rules = rules.filter(models.Q(zone_id=zone_id) | models.Q(zone__isnull=True))
+    else:
+        rules = rules.filter(zone__isnull=True)
+
+    matched = None
+    for r in rules:
+        if r.min_items and items < r.min_items:
+            continue
+        if r.max_items and items > r.max_items:
+            continue
+        if r.min_points and points < r.min_points:
+            continue
+        if r.max_points and points > r.max_points:
+            continue
+        matched = r
+        break
+
+    base_fee = matched.fee_amount if matched else Decimal('0')
+
+    # Transfer surcharge configurable
+    transfer_threshold = SystemConfig.objects.filter(key='transfer_surcharge_threshold').first()
+    transfer_amount = SystemConfig.objects.filter(key='transfer_surcharge_amount').first()
+    surcharge = Decimal('0')
+    try:
+        threshold = Decimal(transfer_threshold.value) if transfer_threshold else Decimal('0')
+        surcharge_val = Decimal(transfer_amount.value) if transfer_amount else Decimal('0')
+    except Exception:
+        threshold = Decimal('0')
+        surcharge_val = Decimal('0')
+
+    if is_transfer and product_amount >= threshold and surcharge_val > 0:
+        surcharge = surcharge_val
+
+    total = (Decimal(base_fee) + surcharge)
+
+    return Response({
+        'base_fee': float(base_fee),
+        'surcharge': float(surcharge),
+        'total': float(total),
+        'rule_id': matched.id if matched else None,
+        'rule_name': matched.name if matched else None,
+    })
+
+
 class DeliveryRequestListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -506,6 +585,36 @@ class DeliveryRequestApproveView(generics.UpdateAPIView):
             delivery.order.delivery_total = fee
             delivery.order.total = (delivery.order.products_subtotal or Decimal('0')) + fee
             delivery.order.save(update_fields=['delivery_total', 'total', 'updated_at'])
+
+            # Enviar notificaciones de chat: informar al cliente y al domiciliario asignado
+            try:
+                if approved and delivery.deliverer:
+                    assigned = delivery.deliverer
+                    client_msg = (
+                        f'Se ha asignado el domiciliario {assigned.user.get_full_name()} (#{assigned.assigned_number}). '
+                        'Tu pedido está en proceso.'
+                    )
+                    # Mensaje dirigido al cliente (ADMIN -> CLIENTE)
+                    DeliveryChatMessage.objects.create(
+                        delivery_request=delivery,
+                        sender=request.user,
+                        recipient_role=User.Role.CLIENTE,
+                        message=client_msg,
+                    )
+
+                    # Mensaje dirigido al domiciliario (ADMIN -> DOMICILIARIO)
+                    deliverer_msg = (
+                        f'Tienes un nuevo domicilio asignado: pedido #{delivery.id}. Revisa los detalles y confirma.'
+                    )
+                    DeliveryChatMessage.objects.create(
+                        delivery_request=delivery,
+                        sender=request.user,
+                        recipient_role=User.Role.DOMICILIARIO,
+                        message=deliverer_msg,
+                    )
+            except Exception:
+                # No bloquear el flujo principal si falla la creación de mensajes
+                pass
 
         return Response(DeliveryRequestSerializer(delivery).data)
 

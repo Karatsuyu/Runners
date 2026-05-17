@@ -18,6 +18,7 @@ import '../../../services/presentation/providers/services_provider.dart';
 
 class AdminDashboardData {
   final int totalUsers;
+  final int nonDelivererUsers;
   final int pendingProviders;
   final int totalOrders;
   final int activeDeliveries;
@@ -25,6 +26,7 @@ class AdminDashboardData {
 
   const AdminDashboardData({
     required this.totalUsers,
+    required this.nonDelivererUsers,
     required this.pendingProviders,
     required this.totalOrders,
     required this.activeDeliveries,
@@ -37,21 +39,147 @@ class AdminDashboardData {
     final orders = (j['orders'] as Map<String, dynamic>?) ?? const {};
     final deliveries = (j['deliveries'] as Map<String, dynamic>?) ?? const {};
 
+    final totalUsersVal = (j['total_users'] as num?)?.toInt() ?? (users['total'] as num?)?.toInt() ?? 0;
+    final deliverersVal = (users['deliverers'] as num?)?.toInt() ?? 0;
     return AdminDashboardData(
-      totalUsers: (j['total_users'] as num?)?.toInt() ??
-          (users['total'] as num?)?.toInt() ??
-          0,
+      totalUsers: totalUsersVal,
+      nonDelivererUsers: (totalUsersVal - deliverersVal) < 0 ? 0 : (totalUsersVal - deliverersVal),
       pendingProviders: (j['pending_providers'] as num?)?.toInt() ??
-          (services['providers_pending_approval'] as num?)?.toInt() ??
-          0,
+        (services['providers_pending_approval'] as num?)?.toInt() ??
+        0,
       totalOrders: (j['total_orders'] as num?)?.toInt() ??
-          (orders['total'] as num?)?.toInt() ??
-          0,
+        (orders['total'] as num?)?.toInt() ??
+        0,
       activeDeliveries: (j['active_deliveries'] as num?)?.toInt() ??
-          (deliveries['active'] as num?)?.toInt() ??
-          0,
+        (deliveries['active'] as num?)?.toInt() ??
+        0,
       totalRevenue: (j['total_revenue'] as num?)?.toDouble() ?? 0.0,
     );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Contact categories manager (admin)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void _openContactCategoryManager(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (_) => const _ContactCategoryManagerDialog(),
+  );
+}
+
+class _ContactCategoryManagerDialog extends ConsumerWidget {
+  const _ContactCategoryManagerDialog({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final categoriesAsync = ref.watch(serviceCategoriesProvider);
+
+    return AlertDialog(
+      title: const Text('Gestionar Categorías (Contactos)'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: categoriesAsync.when(
+          loading: () => const SizedBox(height: 120, child: Center(child: CircularProgressIndicator())),
+          error: (e, _) => Text('Error cargando categorías: $e'),
+          data: (categories) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => _openCreateDialog(context, ref),
+                icon: const Icon(Icons.add),
+                label: const Text('Crear categoría'),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: categories.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final c = categories[index];
+                    return ListTile(
+                      title: Text(c.name),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+      ],
+    );
+  }
+
+  void _openCreateDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (_) => _ContactCategoryCreateDialog(onSave: (name) async {
+        try {
+          final dio = ref.read(dioClientProvider).dio;
+          await dio.post(ApiConstants.serviceCategories, data: {'name': name, 'description': ''});
+          ref.invalidate(serviceCategoriesProvider);
+          if (context.mounted) Navigator.pop(context);
+        } catch (e) {
+          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }),
+    );
+  }
+}
+
+class _ContactCategoryCreateDialog extends StatefulWidget {
+  final Future<void> Function(String name) onSave;
+  const _ContactCategoryCreateDialog({required this.onSave});
+
+  @override
+  State<_ContactCategoryCreateDialog> createState() => _ContactCategoryCreateDialogState();
+}
+
+class _ContactCategoryCreateDialogState extends State<_ContactCategoryCreateDialog> {
+  late TextEditingController _ctrl;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Crear categoría'),
+      content: TextField(controller: _ctrl, decoration: const InputDecoration(labelText: 'Nombre')),
+      actions: [
+        TextButton(onPressed: _loading ? null : () => Navigator.pop(context), child: const Text('Cancelar')),
+        FilledButton(
+          onPressed: _loading ? null : _save,
+          child: _loading ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Guardar'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _save() async {
+    final name = _ctrl.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      await widget.onSave(name);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 }
 
@@ -82,8 +210,23 @@ class AdminUserModel {
 
   factory AdminUserModel.fromJson(Map<String, dynamic> j) => AdminUserModel(
     id: j['id'] as int,
-    firstName: j['first_name'] as String? ?? '',
-    lastName: j['last_name'] as String? ?? '',
+    // backend may return user_name (combined) or first_name / last_name separately
+    firstName: (() {
+      final f = j['first_name'] as String?;
+      if (f != null && f.isNotEmpty) return f;
+      final combined = j['user_name'] as String? ?? '';
+      if (combined.isEmpty) return '';
+      final parts = combined.split(' ');
+      return parts.first;
+    })(),
+    lastName: (() {
+      final l = j['last_name'] as String?;
+      if (l != null && l.isNotEmpty) return l;
+      final combined = j['user_name'] as String? ?? '';
+      if (combined.isEmpty) return '';
+      final parts = combined.split(' ');
+      return parts.length > 1 ? parts.sublist(1).join(' ') : '';
+    })(),
     username: j['username'] as String? ?? '',
     email: j['user_email'] as String? ?? j['email'] as String? ?? '',
     phone: j['phone'] as String? ?? '',
@@ -304,8 +447,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                   childAspectRatio: 1.4,
                   children: [
                     _DashCard(
-                      title: 'Domiciliarios',
-                      value: '${data.totalUsers}',
+                      title: 'Usuarios',
+                      value: '${data.nonDelivererUsers}',
                       icon: Icons.people_outline,
                       color: AppColors.primaryGreen,
                     ),
@@ -346,9 +489,15 @@ class AdminDashboardScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               deliveriesAsync.when(
                 loading: () => const AppLoading(),
-                error: (e, _) => AppErrorWidget(
-                  message: 'Error cargando domicilios',
-                  onRetry: () => ref.invalidate(adminPendingDeliveriesProvider),
+                error: (e, _) => Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Text(
+                      'No hay domicilios en el momento',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
                 data: (items) {
                   if (items.isEmpty) {
@@ -1007,9 +1156,10 @@ class ManageProvidersScreen extends ConsumerWidget {
       ),
       body: providersAsync.when(
         loading: () => const AppLoading(),
-        error: (e, _) => AppErrorWidget(
-          message: 'Error cargando prestadores',
-          onRetry: () => ref.invalidate(providersProvider),
+        error: (e, _) => const AppEmptyState(
+          icon: Icons.work_outline,
+          title: 'Sin prestadores',
+          subtitle: 'Por el momento no hay prestadores',
         ),
         data: (providers) {
           if (providers.isEmpty) {
@@ -1318,6 +1468,11 @@ class ManageContactsScreen extends ConsumerWidget {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.category_outlined),
+            tooltip: 'Gestionar categorías',
+            onPressed: () => _openContactCategoryManager(context, ref),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref.invalidate(contactsProvider),

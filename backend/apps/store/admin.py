@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import Category, Commerce, Product, Order, OrderItem
+from .models import CommerceMenuFile
 
 
 @admin.register(Category)
@@ -23,12 +24,29 @@ class CommerceAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ['created_at', 'updated_at']
-
+    
     def menu_pdf_display(self, obj):
         if obj.menu_pdf:
             return '✓ PDF'
         return '-'
     menu_pdf_display.short_description = 'Menú PDF'
+
+
+class CommerceMenuFileInline(admin.TabularInline):
+    model = CommerceMenuFile
+    extra = 0
+    readonly_fields = ['created_at']
+
+    def filename(self, obj):
+        return obj.file.name.split('/')[-1]
+
+    filename.short_description = 'Archivo'
+
+# add inline to CommerceAdmin (ensure tuple concatenation)
+existing_inlines = getattr(CommerceAdmin, 'inlines', ())
+if not isinstance(existing_inlines, tuple):
+    existing_inlines = tuple(existing_inlines)
+CommerceAdmin.inlines = existing_inlines + (CommerceMenuFileInline,)
 
 
 @admin.register(Product)

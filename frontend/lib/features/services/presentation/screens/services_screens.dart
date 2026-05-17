@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../../core/utils/media_url.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/router/app_routes.dart';
+import '../../../../core/theme/theme_mode_provider.dart';
 
 // ── Services Screen (Client) ─────────────────────────────────────────────
 
@@ -153,6 +154,27 @@ class ServicesScreen extends ConsumerWidget {
                       }
                     },
                   ),
+                      // Theme toggle between Edit profile and Logout (fixed option)
+                      if (!isGuest)
+                        Consumer(
+                          builder: (c, r, _) {
+                            final mode = r.watch(themeModeProvider);
+                            final isDark = mode == ThemeMode.dark;
+                            return ListTile(
+                              leading: const Icon(Icons.brightness_6_outlined),
+                              title: const Text('Cambiar tema'),
+                              trailing: Switch.adaptive(
+                                value: isDark,
+                                onChanged: (v) async {
+                                  await r.read(themeModeProvider.notifier).toggle();
+                                },
+                              ),
+                              onTap: () async {
+                                await r.read(themeModeProvider.notifier).toggle();
+                              },
+                            );
+                          },
+                        ),
                 ListTile(
                   leading: Icon(
                     isGuest ? Icons.login_rounded : Icons.logout,
@@ -670,9 +692,10 @@ class ProviderDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 requestsAsync.when(
                   loading: () => const AppLoading(),
-                  error: (e, _) => AppErrorWidget(
-                    message: 'Error al cargar solicitudes',
-                    onRetry: () => ref.invalidate(myServiceRequestsProvider),
+                  error: (e, _) => const AppEmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: 'Sin solicitudes',
+                    subtitle: 'Por el momento no se han realizado pedidos',
                   ),
                   data: (requests) => requests.isEmpty
                       ? const AppEmptyState(
@@ -823,11 +846,10 @@ class _RegisterProviderScreenState
                   labelText: 'Categoría de servicio',
                   border: OutlineInputBorder(),
                 ),
-                items: cats
-                    .map(
-                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    )
-                    .toList(),
+                items: (() {
+                  final seen = <int>{};
+                  return cats.where((c) => seen.add(c.id)).map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))).toList();
+                })(),
                 onChanged: (v) => setState(() => _selectedCategoryId = v),
               ),
             ),

@@ -49,6 +49,28 @@ class Commerce(models.Model):
         return f'{self.name} - {self.category.name}'
 
 
+class CommerceMenuFile(models.Model):
+    """Archivo asociado a la carta/menú de un comercio (imagen o PDF).
+    Permite múltiples archivos por comercio.
+    """
+    class FileType(models.TextChoices):
+        IMAGE = 'IMAGE', 'Imagen'
+        PDF = 'PDF', 'PDF'
+
+    commerce = models.ForeignKey(Commerce, on_delete=models.CASCADE, related_name='menu_files')
+    file = models.FileField(upload_to='store/menus/')
+    file_type = models.CharField(max_length=10, choices=FileType.choices, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'store_commerce_menu_files'
+        verbose_name = 'Archivo de Carta'
+        verbose_name_plural = 'Archivos de Carta'
+
+    def __str__(self):
+        return f'{self.commerce.name} - {self.file.name.split('/')[-1]}'
+
+
 class Product(models.Model):
     commerce = models.ForeignKey(Commerce, on_delete=models.CASCADE, related_name='products')
     name = models.CharField(max_length=200)

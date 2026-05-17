@@ -1,5 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io' show Platform;
 
 class ApiConstants {
   static String get baseUrl {
@@ -9,9 +10,18 @@ class ApiConstants {
         dotenv.env['API_BASE_URL'] ??
         defaultUrl;
 
-    // 10.0.2.2 is only valid inside Android emulator.
-    if (kIsWeb && rawBaseUrl.contains('10.0.2.2')) {
-      return rawBaseUrl.replaceFirst('10.0.2.2', 'localhost');
+    // 10.0.2.2 is only valid inside Android emulator. If running on desktop
+    // or debug session that is not Android, convert it to localhost so the
+    // backend on the host machine is reachable.
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        return rawBaseUrl;
+      }
+      if (rawBaseUrl.contains('10.0.2.2')) {
+        return rawBaseUrl.replaceFirst('10.0.2.2', '127.0.0.1');
+      }
+    } catch (_) {
+      // If Platform check fails, fall back to rawBaseUrl
     }
 
     return rawBaseUrl;
@@ -52,6 +62,7 @@ class ApiConstants {
   static const String delivererStatus = '/deliveries/deliverers/status/';
   static const String deliveryRequests = '/deliveries/requests/';
   static const String createDeliveryRequest = '/deliveries/requests/create/';
+  static const String deliveryEstimate = '/deliveries/estimate/';
   static String deliveryRequestDetail(int id) => '/deliveries/requests/$id/';
   static String assignDelivery(int id) => '/deliveries/requests/$id/assign/';
   static String approveDelivery(int id) => '/deliveries/requests/$id/approve/';

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:async';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/notifications_service.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
@@ -9,6 +10,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/media_url.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../auth/presentation/screens/profile_screen.dart';
 import '../../../store/presentation/providers/store_provider.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
@@ -18,6 +20,16 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../providers/deliveries_provider.dart';
 
 final Set<int> _notifiedDeliveryIds = <int>{};
+
+const List<Map<String, dynamic>> ZONE_OPTIONS = [
+  {'id': 1, 'label': 'Caicedonia', 'fee': 3000.0},
+  {'id': 2, 'label': 'Barragán (antes del puente)', 'fee': 10000.0},
+  {'id': 3, 'label': 'Barragán (después del puente)', 'fee': 12000.0},
+  {'id': 4, 'label': 'Condominios de Barragán', 'fee': 14000.0},
+  {'id': 5, 'label': 'La Camelia', 'fee': 6000.0},
+  {'id': 6, 'label': 'Club Casa y Pesca', 'fee': 5000.0},
+  {'id': 7, 'label': 'Delicias / Las Delicias', 'fee': 5000.0},
+];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLIENTE: DeliveriesScreen
@@ -35,7 +47,13 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
   final _pickupCtrl = TextEditingController();
   final _deliveryCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  String _requestKind = 'RECOGER_ENTREGAR';
+  bool _isTransfer = false;
+  final _phoneCtrl = TextEditingController();
   bool _loading = false;
+  Timer? _assignmentPoller;
+  int? _selectedZoneId;
+  // zones now provided by top-level ZONE_OPTIONS
 
   Future<bool> _openEditProfileDialog(UserEntity? user) async {
     final firstNameController = TextEditingController(
@@ -167,6 +185,27 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                       }
                     },
                   ),
+                  // Theme toggle: keep consistent with other screens
+                  if (!isGuest)
+                    Consumer(
+                      builder: (c, r, _) {
+                        final mode = r.watch(themeModeProvider);
+                        final isDark = mode == ThemeMode.dark;
+                        return ListTile(
+                          leading: const Icon(Icons.brightness_6_outlined),
+                          title: const Text('Cambiar tema'),
+                          trailing: Switch.adaptive(
+                            value: isDark,
+                            onChanged: (v) async {
+                              await r.read(themeModeProvider.notifier).toggle();
+                            },
+                          ),
+                          onTap: () async {
+                            await r.read(themeModeProvider.notifier).toggle();
+                          },
+                        );
+                      },
+                    ),
                 ListTile(
                   leading: Icon(
                     isGuest ? Icons.login_rounded : Icons.logout,
@@ -210,9 +249,11 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
 
   @override
   void dispose() {
+    _assignmentPoller?.cancel();
     _pickupCtrl.dispose();
     _deliveryCtrl.dispose();
     _descCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -221,24 +262,118 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
     setState(() => _loading = true);
     try {
       final ds = ref.read(deliveriesDataSourceProvider);
-      await ds.createDeliveryRequest(
+      final cartNotifier = ref.read(cartProvider.notifier);
+      final productAmount = cartNotifier.total;
+      final itemsCount = cartNotifier.itemCount;
+      // Estimate fee first (include cart totals so estimate includes products)
+      final estimate = await ds.estimateDeliveryFee(
+        requestKind: _requestKind,
+        itemsCount: itemsCount > 0 ? itemsCount : 1,
+        pointsCount: 1,
+        productAmount: productAmount > 0 ? productAmount : null,
+        isTransferPayment: _isTransfer,
+      );
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          // compute displayed estimate: backend estimate + selected zone fee (if any)
+          final backendTotal = (estimate['total'] as num?)?.toDouble() ?? 0.0;
+          final zoneFee = (_selectedZoneId != null)
+              ? (ZONE_OPTIONS.firstWhere((z) => z['id'] == _selectedZoneId)['fee'] as double)
+              : 0.0;
+          final displayTotal = backendTotal + zoneFee;
+          return AlertDialog(
+            title: const Text('Confirmar domicilio'),
+            content: Text('Costo estimado: \$${displayTotal.toStringAsFixed(2)}.\n\n¿Deseas confirmar el pedido?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancelar')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Confirmar')),
+          ],
+          );
+        },
+      );
+      if (confirmed != true) {
+        if (mounted) setState(() => _loading = false);
+        return;
+      }
+
+      final created = await ds.createDeliveryRequest(
         pickupAddress: _pickupCtrl.text.trim(),
         deliveryAddress: _deliveryCtrl.text.trim(),
         description: _descCtrl.text.trim(),
+        requestKind: _requestKind,
+        isTransferPayment: _isTransfer,
+        itemsCount: itemsCount,
+        productAmount: productAmount > 0 ? productAmount : null,
+        zone: _selectedZoneId,
       );
       _pickupCtrl.clear();
       _deliveryCtrl.clear();
       _descCtrl.clear();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              '¡Domicilio solicitado! Asignando repartidor automáticamente...',
-            ),
+        // Show a persistent top banner while assignment is in progress
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: const Text('¡Domicilio solicitado! Asignando repartidor automáticamente...'),
             backgroundColor: AppColors.success,
+            actions: [
+              TextButton(
+                onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                child: const Text('Cerrar', style: TextStyle(color: Colors.white)),
+              ),
+            ],
           ),
         );
         ref.invalidate(myDeliveryRequestsProvider);
+
+        // If backend already returned an assigned deliverer, open chat immediately
+        if ((created.delivererName != null) || (created.status == 'assigned')) {
+          // hide persistent top banner and open chat
+          ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+          await showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => _DeliveryChatSheet(deliveryId: created.id),
+          );
+        } else {
+          // Start polling for assignment (every 5s), timeout after ~5 minutes
+          int attempts = 0;
+          _assignmentPoller?.cancel();
+          _assignmentPoller = Timer.periodic(const Duration(seconds: 5), (t) async {
+            attempts += 1;
+            try {
+              final list = await ds.getMyDeliveryRequests();
+              final found = list.firstWhere((d) => d.id == created.id, orElse: () => created);
+              if ((found.delivererName != null) || (found.status == 'assigned')) {
+                t.cancel();
+                _assignmentPoller = null;
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                ref.invalidate(myDeliveryRequestsProvider);
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (_) => _DeliveryChatSheet(deliveryId: found.id),
+                );
+              } else if (attempts > 60) {
+                // timeout (~5 minutes)
+                t.cancel();
+                _assignmentPoller = null;
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No se encontró repartidor automáticamente. Intenta más tarde.'),
+                    backgroundColor: AppColors.warning,
+                  ),
+                );
+              }
+            } catch (_) {
+              // ignore transient errors, continue polling
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -258,9 +393,12 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
   Widget build(BuildContext context) {
     final requestsAsync = ref.watch(myDeliveryRequestsProvider);
     final cart = ref.watch(cartProvider);
+    // Resolve a secondary text color from theme to adapt to dark mode
+    final textSecondaryColor = Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+      // Use theme scaffold background so dark mode renders properly
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.person_outline),
@@ -272,21 +410,6 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          Consumer(builder: (context, ref, _) {
-            final mode = ref.watch(themeModeProvider);
-            final isDark = mode == ThemeMode.dark;
-            return Row(
-              children: [
-                Icon(isDark ? Icons.nightlight_round : Icons.wb_sunny),
-                Switch(
-                  value: isDark,
-                  onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-                  activeColor: Colors.white,
-                  inactiveThumbColor: Colors.white,
-                ),
-              ],
-            );
-          }),
           Stack(
             children: [
               IconButton(
@@ -348,7 +471,7 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                       Text(
                         'Un repartidor disponible será asignado automáticamente',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: textSecondaryColor,
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -369,6 +492,24 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                             ? 'Ingresa la dirección de entrega'
                             : null,
                       ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<int>(
+                        isExpanded: true,
+                        isDense: true,
+                        value: _selectedZoneId,
+                        decoration: const InputDecoration(labelText: 'Zona / Sector'),
+                        items: ZONE_OPTIONS
+                            .map((z) {
+                              final label = z['label'] as String;
+                              final fee = z['fee'] as double;
+                              return DropdownMenuItem(
+                                value: z['id'] as int,
+                                child: Text('$label — ${AppFormatters.currency(fee)}'),
+                              );
+                            })
+                            .toList(),
+                        onChanged: (v) => setState(() => _selectedZoneId = v),
+                      ),
                       const SizedBox(height: 12),
                       AppTextField(
                         controller: _descCtrl,
@@ -378,6 +519,39 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                         validator: (v) => v == null || v.trim().isEmpty
                             ? 'Describe qué necesitas enviar'
                             : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        isExpanded: true,
+                        isDense: true,
+                        value: _requestKind,
+                        decoration: const InputDecoration(labelText: 'Tipo de servicio'),
+                        items: const [
+                          DropdownMenuItem(value: 'RECOGER_ENTREGAR', child: Text('Recoger y entregar')),
+                          DropdownMenuItem(value: 'COMPRA_SENCILLA', child: Text('Compra sencilla')),
+                          DropdownMenuItem(value: 'SUPERMERCADO', child: Text('Supermercado')),
+                          DropdownMenuItem(value: 'MULTIPUNTO', child: Text('Multipunto')),
+                        ],
+                        onChanged: (v) => setState(() => _requestKind = v ?? 'RECOGER_ENTREGAR'),
+                      ),
+                      const SizedBox(height: 8),
+                      AppTextField(
+                        controller: _phoneCtrl,
+                        label: 'Teléfono de contacto',
+                        prefixIcon: Icons.phone_outlined,
+                        keyboardType: TextInputType.phone,
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Ingresa un teléfono de contacto' : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text('Pago por transferencia?'),
+                          const SizedBox(width: 8),
+                          Switch(
+                            value: _isTransfer,
+                            onChanged: (v) => setState(() => _isTransfer = v),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       AppButton(
@@ -405,9 +579,10 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
 
             requestsAsync.when(
               loading: () => const AppLoading(),
-              error: (e, _) => AppErrorWidget(
-                message: 'Error al cargar solicitudes',
-                onRetry: () => ref.invalidate(myDeliveryRequestsProvider),
+              error: (e, _) => const AppEmptyState(
+                icon: Icons.delivery_dining_outlined,
+                title: 'Sin solicitudes',
+                subtitle: 'Por el momento no se han realizado pedidos',
               ),
               data: (requests) {
                 if (requests.isEmpty) {
@@ -501,21 +676,21 @@ class _DeliveryRequestCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             _AddressRow(icon: Icons.location_on, text: request.deliveryAddress),
-            if (request.delivererName != null) ...[
+              if (request.delivererName != null) ...[
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.person_outline,
                     size: 14,
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Repartidor: ${request.delivererName}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -523,7 +698,7 @@ class _DeliveryRequestCard extends StatelessWidget {
             ],
             const SizedBox(height: 6),
             Row(
-              children: [
+                children: [
                 Icon(
                   request.approvalStatus == 'AUTORIZADO'
                       ? Icons.verified
@@ -536,16 +711,63 @@ class _DeliveryRequestCard extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   'Aprobación: ${request.approvalStatus}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary),
                 ),
               ],
             ),
+            // Show zone tariff if available (from backend or mapped by zone id)
+            () {
+              double? zoneFee = request.zoneFee;
+              if (zoneFee == null && request.zoneId != null) {
+                try {
+                  zoneFee = ZONE_OPTIONS.firstWhere((z) => z['id'] == request.zoneId)['fee'] as double?;
+                } catch (_) {
+                  zoneFee = null;
+                }
+              }
+              if (zoneFee != null) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text(
+                      'Tarifa zona: ${AppFormatters.currency(zoneFee)}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                  ],
+                );
+              }
+              return const SizedBox.shrink();
+            }(),
             if (request.adminDeliveryFee != null) ...[
               const SizedBox(height: 4),
               Text(
                 'Valor domicilio: ${AppFormatters.currency(request.adminDeliveryFee!)}',
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
+              // show total if both admin fee and zone fee are present
+              Builder(builder: (context) {
+                double? zoneFee = request.zoneFee;
+                if (zoneFee == null && request.zoneId != null) {
+                  try {
+                    zoneFee = ZONE_OPTIONS.firstWhere((z) => z['id'] == request.zoneId)['fee'] as double?;
+                  } catch (_) {
+                    zoneFee = null;
+                  }
+                }
+                if (zoneFee != null) {
+                  final total = request.adminDeliveryFee! + zoneFee;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      'Total: ${AppFormatters.currency(total)}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              }),
             ],
             const SizedBox(height: 6),
             Align(
@@ -565,9 +787,9 @@ class _DeliveryRequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(request.createdAt),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
               ),
             ),
           ],
@@ -613,11 +835,135 @@ class DelivererDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(myDelivererProfileProvider);
     final deliveriesAsync = ref.watch(myDeliveriesProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Mi Panel'),
+        leading: profileAsync.when(
+          loading: () => Padding(
+            padding: const EdgeInsets.only(left: 12.0),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+          ),
+          error: (_, __) => Padding(
+            padding: const EdgeInsets.only(left: 12.0),
+            child: CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.white24,
+              child: const Icon(Icons.person, color: Colors.white),
+            ),
+          ),
+          data: (profile) {
+              final user = ref.read(authProvider).user;
+              final imageUrl = resolveMediaUrl(user?.profileImageUrl);
+              return Padding(
+                padding: const EdgeInsets.only(left: 8.0),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(24),
+                  onTap: () async {
+                    await showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: false,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                      ),
+                      builder: (ctx) {
+                        return SafeArea(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor: AppColors.primaryGreen.withValues(alpha: 0.1),
+                                        backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+                                        child: imageUrl == null ? const Icon(Icons.person, size: 30) : null,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              user?.fullName.isNotEmpty == true ? user!.fullName : profile.fullName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(user?.email ?? '', style: const TextStyle(color: Colors.grey)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Divider(),
+                                ListTile(
+                                  leading: const Icon(Icons.edit_outlined),
+                                  title: const Text('Editar perfil'),
+                                  onTap: () async {
+                                    Navigator.pop(ctx);
+                                    await Navigator.of(context).push(MaterialPageRoute(
+                                      builder: (_) => const ProfileScreen(),
+                                    ));
+                                    ref.invalidate(myDelivererProfileProvider);
+                                    ref.invalidate(financialRecordsProvider);
+                                  },
+                                ),
+                                Consumer(
+                                  builder: (c, r, _) {
+                                    final mode = r.watch(themeModeProvider);
+                                    final isDark = mode == ThemeMode.dark;
+                                    return ListTile(
+                                      leading: const Icon(Icons.brightness_6_outlined),
+                                      title: const Text('Cambiar tema'),
+                                      trailing: Switch.adaptive(
+                                        value: isDark,
+                                        onChanged: (v) async {
+                                          await r.read(themeModeProvider.notifier).toggle();
+                                        },
+                                      ),
+                                      onTap: () async {
+                                        await r.read(themeModeProvider.notifier).toggle();
+                                      },
+                                    );
+                                  },
+                                ),
+                                ListTile(
+                                  leading: const Icon(Icons.logout, color: Colors.red),
+                                  title: const Text('Cerrar sesión', style: TextStyle(color: Colors.red)),
+                                  onTap: () async {
+                                    Navigator.pop(ctx);
+                                    await ref.read(authProvider.notifier).logout();
+                                    context.go('/login');
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white24,
+                    backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+                    child: imageUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
+                  ),
+                ),
+              );
+            },
+        ),
+        title: const Text('Domiciliario Runners'),
         backgroundColor: AppColors.primaryGreen,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -666,9 +1012,15 @@ class DelivererDashboardScreen extends ConsumerWidget {
               // ── Assigned Deliveries ───────────────────────────────
               deliveriesAsync.when(
                 loading: () => const AppLoading(),
-                error: (e, _) => AppErrorWidget(
-                  message: 'Error cargando domicilios',
-                  onRetry: () => ref.invalidate(myDeliveriesProvider),
+                error: (e, _) => Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'No hay domicilios en el momento',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                 ),
                 data: (deliveries) {
                   final active = deliveries
@@ -779,10 +1131,10 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
-                        profile.phone,
-                        style: const TextStyle(color: AppColors.textSecondary),
-                      ),
+                       Text(
+                         profile.phone,
+                         style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary),
+                       ),
                     ],
                   ),
                 ),
@@ -804,6 +1156,7 @@ class _DelivererProfileCardState extends ConsumerState<_DelivererProfileCard> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 6),
               ],
             ),
 
@@ -908,13 +1261,13 @@ class _StatCard extends StatelessWidget {
             value,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
           ),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
+             Text(
+               label,
+               style: TextStyle(
+                 fontSize: 12,
+                 color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
+               ),
+             ),
         ],
       ),
     );
@@ -968,19 +1321,19 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
   Future<void> _complete() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Confirmar entrega'),
         content: const Text('¿Confirmas que el domicilio fue entregado?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGreen,
             ),
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text(
               'Confirmar',
               style: TextStyle(color: Colors.white),
@@ -1199,15 +1552,37 @@ class _DeliveryChatSheetState extends ConsumerState<_DeliveryChatSheet> {
 // DOMICILIARIO: MyDeliveriesScreen
 // ─────────────────────────────────────────────────────────────────────────────
 
-class MyDeliveriesScreen extends ConsumerWidget {
+class MyDeliveriesScreen extends ConsumerStatefulWidget {
   const MyDeliveriesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MyDeliveriesScreen> createState() => _MyDeliveriesScreenState();
+}
+
+class _MyDeliveriesScreenState extends ConsumerState<MyDeliveriesScreen> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted) return;
+      ref.invalidate(myDeliveriesProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final deliveriesAsync = ref.watch(myDeliveriesProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Mis Domicilios'),
         backgroundColor: AppColors.primaryGreen,
@@ -1222,9 +1597,10 @@ class MyDeliveriesScreen extends ConsumerWidget {
       ),
       body: deliveriesAsync.when(
         loading: () => const AppLoading(),
-        error: (e, _) => AppErrorWidget(
-          message: 'Error al cargar domicilios',
-          onRetry: () => ref.invalidate(myDeliveriesProvider),
+        error: (e, _) => const AppEmptyState(
+          icon: Icons.delivery_dining_outlined,
+          title: 'Sin domicilios',
+          subtitle: 'Por el momento no se han realizado domicilios',
         ),
         data: (deliveries) {
           if (deliveries.isEmpty) {
@@ -1235,7 +1611,7 @@ class MyDeliveriesScreen extends ConsumerWidget {
             );
           }
           return RefreshIndicator(
-            color: AppColors.primaryGreen,
+            color: Theme.of(context).colorScheme.primary,
             onRefresh: () async => ref.invalidate(myDeliveriesProvider),
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
@@ -1310,10 +1686,10 @@ class _DeliveryHistoryCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.person_outline,
                   size: 14,
-                  color: AppColors.textSecondary,
+                  color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
                 ),
                 const SizedBox(width: 4),
                 Text(delivery.clientName, style: const TextStyle(fontSize: 13)),
@@ -1355,9 +1731,9 @@ class _DeliveryHistoryCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(delivery.createdAt),
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary,
+                color: Theme.of(context).textTheme.bodySmall?.color ?? AppColors.textSecondary,
               ),
             ),
           ],
@@ -1409,7 +1785,7 @@ class FinancialRecordsScreen extends ConsumerWidget {
     final recordsAsync = ref.watch(financialRecordsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Finanzas'),
         backgroundColor: AppColors.primaryGreen,

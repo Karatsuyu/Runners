@@ -32,29 +32,7 @@ class ClientShell extends ConsumerWidget {
 
     return Scaffold(
       body: child,
-      floatingActionButton: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: const [BoxShadow(blurRadius: 6, color: Colors.black12)],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              ref.watch(themeModeProvider) == ThemeMode.dark
-                  ? Icons.nightlight_round
-                  : Icons.wb_sunny,
-              size: 18,
-            ),
-            Switch(
-              value: ref.watch(themeModeProvider) == ThemeMode.dark,
-              onChanged: (_) => ref.read(themeModeProvider.notifier).toggle(),
-            ),
-          ],
-        ),
-      ),
+      // Floating theme toggle removed per request
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,
         onDestinationSelected: (i) => context.go(tabs[i].route),

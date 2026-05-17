@@ -10,7 +10,9 @@ from apps.users.permissions import IsAdmin
 class ContactSerializer(drf_serializers.ModelSerializer):
     type = drf_serializers.SerializerMethodField()
     image_url = drf_serializers.SerializerMethodField()
+    category_name = drf_serializers.SerializerMethodField()
     owner_id = drf_serializers.IntegerField(source='owner.id', read_only=True)
+    category = drf_serializers.IntegerField(required=False, allow_null=True, write_only=True)
     approval_status = drf_serializers.CharField(read_only=True)
     rejection_reason = drf_serializers.CharField(read_only=True)
 
@@ -30,6 +32,7 @@ class ContactSerializer(drf_serializers.ModelSerializer):
             'approval_status',
             'rejection_reason',
             'is_active',
+            'category',
             'created_at',
         ]
         read_only_fields = ['id', 'created_at']
@@ -55,6 +58,9 @@ class ContactSerializer(drf_serializers.ModelSerializer):
         if request is None:
             return obj.image.url
         return request.build_absolute_uri(obj.image.url)
+
+    def get_category_name(self, obj):
+        return obj.category.name if obj.category else None
 
     def validate(self, attrs):
         raw_type = self.initial_data.get('type')
@@ -93,6 +99,9 @@ class ContactSerializer(drf_serializers.ModelSerializer):
             is_owner = user and user.is_authenticated and instance.owner_id == user.id
             if not is_admin and not is_owner:
                 ret['phone'] = 'Privado'
+
+        if instance.category:
+            ret['category_name'] = instance.category.name
 
         return ret
 

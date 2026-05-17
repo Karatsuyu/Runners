@@ -1,0 +1,44 @@
+Informe rápido de pendientes, errores y funciones con poca lógica
+Fecha: 2026-05-17
+
+Resumen general:
+- El frontend tiene implementaciones razonables para el feature de autenticación, tienda y servicios.
+- Hay áreas con poca o ninguna lógica (models globales, cobertura de tests, algunas features con solo capa de presentación).
+- Encontré prints/depuración en el backend que indican zonas sensibles a errores (p. ej. subida/eliminación de archivos).
+
+Hallazgos concretos (archivos/ubicaciones):
+- frontend/lib/models/  -> Carpeta vacía. Falta definir modelos compartidos (User, Address, Order, etc.).
+- frontend/test/       -> Cobertura de tests mínima (solo pruebas unitarias sencillas para AuthService y mocks). Faltan tests por feature (store, services, deliveries, contacts, admin).
+- frontend/lib/services/auth_service.dart -> Implementación básica OK (síncrona y rol simulado). Considerar integrar con usecases/remote en vez de usar credenciales hardcodeadas si se busca realismo.
+
+Backend (backend/apps):
+- backend/apps/store/views.py -> Contiene múltiples prints de debug y lógica de permisos en CommerceMenuFileDetailView (validación de user.role). Revisar y normalizar manejo de errores y permisos.
+- Revisar endpoints del backend para asegurar consistencia de nombres de roles/fields con frontend (p. ej. `role` string vs enum `UserRole`).
+
+Perfiles/funciones faltantes o con poca lógica:
+- Modelos globales frontend: falta un `User`/`Profile` central en `frontend/lib/models` usado por distintas features.
+- Tests: implementar tests unitarios y de integración para: store (carrito, pedidos), services (registro de prestador, solicitudes), deliveries (asignación y seguimiento), contacts (lista/contactos), admin (gestión de comercios y usuarios).
+- Validaciones de forms: many presentation screens reference usecases/providers, pero no hay validaciones robustas visibles (ej. register/updateProfile input checks). Añadir validaciones y mensajes de error de UI.
+- Manejo de errores en la UI: revisar que los providers muestran mensajes de error consistentes (uso de `failure.message` ya existe, pero verificar mapping y traducciones).
+
+Recomendaciones prioritarias (ordenadas):
+1) Añadir modelos compartidos en `frontend/lib/models` y migrar definiciones inline (p. ej. `store` modelos) a archivos separados.
+2) Aumentar cobertura de tests: crear pruebas para cada feature principal (store, services, deliveries, auth, admin).
+3) Revisar y limpiar prints/depuración en backend; asegurar respuestas JSON consistentes y códigos HTTP apropiados.
+4) Verificar mapeo `role` entre backend y frontend (strings vs enum names) y documentarlo.
+5) Añadir validaciones de entrada en pantallas de registro y perfil; añadir tests para validaciones.
+6) Revisar manejo de archivos (subida/ eliminación) en `CommerceMenuFile` para evitar errores en producción.
+
+Siguientes pasos sugeridos (opciones):
+- ¿Quieres que genere un checklist TODO (issue list) en formato detallado por archivo y línea para comenzar a resolverlo? (Puedo crearlo y marcar prioridades).
+- ¿Quieres que añada tests iniciales para `store` o `services` ahora?
+
+Archivos consultados rápidamente (ejemplos):
+- frontend/test/unit/auth_service_test.dart
+- frontend/lib/services/auth_service.dart
+- frontend/lib/features/auth/presentation/providers/auth_provider.dart
+- frontend/lib/features/store/presentation/providers/store_provider.dart
+- frontend/lib/features/services/presentation/providers/services_provider.dart
+- backend/apps/store/views.py
+
+Fin del informe.

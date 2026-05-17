@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
+import logging
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.core.mail import send_mail
 from django.conf import settings
@@ -36,6 +37,33 @@ class RegisterView(generics.CreateAPIView):
                 'access': str(refresh.access_token),
             }
         }, status=status.HTTP_201_CREATED)
+
+
+# Vista de login que añade logging para diagnósticos en consola
+_logger = logging.getLogger(__name__)
+
+
+class LoggingTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        try:
+            _logger.info('Login attempt: path=%s remote=%s data_keys=%s',
+                         request.path,
+                         request.META.get('REMOTE_ADDR'),
+                         list(request.data.keys()) if hasattr(request, 'data') else None)
+        except Exception:
+            pass
+
+        response = super().post(request, *args, **kwargs)
+
+        try:
+            data_summary = None
+            if hasattr(response, 'data') and isinstance(response.data, dict):
+                data_summary = list(response.data.keys())
+            _logger.info('Login response: status=%s data_keys=%s', response.status_code, data_summary)
+        except Exception:
+            pass
+
+        return response
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):

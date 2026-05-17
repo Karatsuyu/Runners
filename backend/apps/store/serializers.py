@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Commerce, Product, Order, OrderItem
+from .models import Category, Commerce, Product, Order, OrderItem, CommerceMenuFile
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -26,7 +26,10 @@ class CommerceSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Commerce
-        fields = ['id', 'category', 'category_name', 'name', 'description', 'phone', 'address', 'image', 'menu_pdf', 'is_active', 'products_count', 'created_at', 'updated_at']
+        fields = [
+            'id', 'category', 'category_name', 'name', 'description', 'phone', 'address',
+            'image', 'menu_pdf', 'is_active', 'products_count', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'products_count', 'category_name']
 
     def get_products_count(self, obj):
@@ -35,9 +38,23 @@ class CommerceSerializer(serializers.ModelSerializer):
 
 class CommerceDetailSerializer(CommerceSerializer):
     products = ProductSerializer(many=True, read_only=True)
+    menu_files = serializers.SerializerMethodField()
 
     class Meta(CommerceSerializer.Meta):
-        fields = CommerceSerializer.Meta.fields + ['products']
+        fields = CommerceSerializer.Meta.fields + ['products', 'menu_files']
+
+    def get_menu_files(self, obj):
+        files = obj.menu_files.all().order_by('-created_at')
+        return [
+            {
+                'id': f.id,
+                'url': f.file.url if f.file else None,
+                'filename': f.file.name.split('/')[-1] if f.file else None,
+                'file_type': f.file_type,
+                'created_at': f.created_at,
+            }
+            for f in files
+        ]
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -110,3 +127,15 @@ class OrderCreateSerializer(serializers.Serializer):
 
         order.calculate_total()
         return order
+
+
+class CommerceMenuFileSerializer(serializers.ModelSerializer):
+    filename = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = CommerceMenuFile
+        fields = ['id', 'commerce', 'file', 'filename', 'file_type', 'created_at']
+        read_only_fields = ['id', 'filename', 'created_at', 'commerce']
+
+    def get_filename(self, obj):
+        return obj.file.name.split('/')[-1] if obj.file else None
