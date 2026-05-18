@@ -1,0 +1,40 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+# IDE
+*.iml
+frontend/.idea/
+
+# Python
+.venv/
+backend/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment files
+frontend/.env
+backend/.env
+
+# Backend generated files
+backend/db.sqlite3
+backend/media/
+
+# Flutter / Dart generated files
+frontend/.dart_tool/
+frontend/.flutter-plugins-dependencies
+frontend/.packages
+frontend/build/
+frontend/.pub-cache/
+frontend/.pub/
+frontend/coverage/
+frontend/android/local.properties
+frontend/**/Flutter/ephemeral/
+frontend/**/Flutter/Generated.xcconfig
+frontend/**/flutter_export_environment.sh
+frontend/**/.last_build_id

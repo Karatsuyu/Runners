@@ -1,0 +1,484 @@
+{
+  "info": {
+    "name": "Runners API – Colección de pruebas",
+    "description": "Colección completa para probar todos los endpoints del backend de Runners (Django REST Framework).\n\nBase URL: http://localhost:8000/api/v1/\n\nSuperusuario: admin@runners.co / (ver createsuperuser)\nCliente: cliente1@runners.co / Runners2024!\nDomiciliario: domi1@runners.co / Runners2024!\nPrestador: prest1@runners.co / Runners2024!",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",       "value": "http://localhost:8000/api/v1" },
+    { "key": "access_token",   "value": "" },
+    { "key": "refresh_token",  "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 Auth",
+      "item": [
+        {
+          "name": "Registrar usuario (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/register/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nuevo@runners.co\",\n  \"first_name\": \"Nuevo\",\n  \"last_name\": \"Usuario\",\n  \"phone\": \"3109998877\",\n  \"password\": \"Runners2024!\",\n  \"password2\": \"Runners2024!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (cliente1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access) { pm.collectionVariables.set('access_token', json.access); }",
+                  "if (json.refresh) { pm.collectionVariables.set('refresh_token', json.refresh); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente1@runners.co\",\n  \"password\": \"Runners2024!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (domiciliario1)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"domi1@runners.co\",\n  \"password\": \"Runners2024!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (prestador1)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/login/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"prest1@runners.co\",\n  \"password\": \"Runners2024!\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Renovar token (refresh)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/auth/token/refresh/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Ver mi perfil",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/profile/"
+          }
+        },
+        {
+          "name": "Editar mi perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/auth/profile/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"3199999999\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[ADMIN] Listar usuarios",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/users/"
+          }
+        },
+        {
+          "name": "[ADMIN] Suspender usuario id=2",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/auth/users/2/toggle-status/"
+          }
+        },
+        {
+          "name": "Logout (blacklist)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/auth/logout/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🛒 Tienda",
+      "item": [
+        {
+          "name": "Listar categorías",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/store/categories/"
+          }
+        },
+        {
+          "name": "Listar comercios",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/store/commerces/"
+          }
+        },
+        {
+          "name": "Detalle comercio id=1 (incluye productos)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/store/commerces/1/"
+          }
+        },
+        {
+          "name": "Productos del comercio id=1",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/store/commerces/1/products/"
+          }
+        },
+        {
+          "name": "Crear pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/store/orders/create/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commerce_id\": 1,\n  \"items\": [\n    { \"product\": 1, \"quantity\": 1 },\n    { \"product\": 4, \"quantity\": 2 }\n  ],\n  \"notes\": \"Sin cebolla por favor\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mis pedidos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/store/orders/"
+          }
+        },
+        {
+          "name": "[ADMIN] Cambiar estado pedido id=1",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/store/orders/1/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONFIRMADO\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🔧 Servicios",
+      "item": [
+        {
+          "name": "Categorías de servicio",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/services/categories/"
+          }
+        },
+        {
+          "name": "Prestadores disponibles (directorio)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/services/providers/"
+          }
+        },
+        {
+          "name": "Prestadores por categoría",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/services/providers/?category=1",
+              "query": [{ "key": "category", "value": "1" }]
+            }
+          }
+        },
+        {
+          "name": "Solicitar servicio (va al admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/services/requests/create/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": 1,\n  \"category\": 1,\n  \"description\": \"Necesito instalar toma corrientes en la sala y cocina\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mis solicitudes de servicio",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/services/requests/"
+          }
+        },
+        {
+          "name": "[ADMIN] Aprobar prestador id=1",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/services/providers/1/approve/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[ADMIN] Rechazar prestador id=1",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/services/providers/1/approve/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\",\n  \"reason\": \"Documentación incompleta\"\n}"
+            }
+          }
+        },
+        {
+          "name": "[PRESTADOR] Cambiar mi estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/services/providers/status/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"OCUPADO\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "🛵 Domicilios (auto-asignación)",
+      "item": [
+        {
+          "name": "Listar domiciliarios disponibles",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/deliveries/deliverers/"
+          }
+        },
+        {
+          "name": "Solicitar domicilio (auto-asigna)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/deliveries/requests/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Recoger pedido en Asadero El Rincón Paisa y entregar en Calle 8 # 3-20\",\n  \"pickup_address\": \"Calle 5 # 4-30\",\n  \"delivery_address\": \"Calle 8 # 3-20\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Ver mis solicitudes (cliente)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/deliveries/requests/"
+          }
+        },
+        {
+          "name": "Completar domicilio id=1 (domiciliario)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/deliveries/requests/1/complete/"
+          }
+        },
+        {
+          "name": "Cancelar domicilio id=1 (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/deliveries/requests/1/cancel/"
+          }
+        },
+        {
+          "name": "[DOMICILIARIO] Cambiar mi estado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/deliveries/deliverers/status/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"DISPONIBLE\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Mis registros financieros (domiciliario)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/deliveries/records/"
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📞 Contactos",
+      "item": [
+        {
+          "name": "Directorio completo",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/contacts/"
+          }
+        },
+        {
+          "name": "Filtrar por tipo EMERGENCIA",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/contacts/?type=EMERGENCIA",
+              "query": [{ "key": "type", "value": "EMERGENCIA" }]
+            }
+          }
+        },
+        {
+          "name": "Buscar contacto",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/contacts/?search=policia",
+              "query": [{ "key": "search", "value": "policia" }]
+            }
+          }
+        },
+        {
+          "name": "[ADMIN] Crear contacto",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": "{{base_url}}/contacts/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Veterinaria Huellitas\",\n  \"phone\": \"3157778899\",\n  \"description\": \"Atención veterinaria 24h\",\n  \"contact_type\": \"COMERCIO\"\n}"
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "📊 Reportes (solo admin)",
+      "item": [
+        {
+          "name": "Dashboard general",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reports/dashboard/"
+          }
+        },
+        {
+          "name": "Reporte de ventas (últimos 30 días)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/reports/sales/?days=30",
+              "query": [{ "key": "days", "value": "30" }]
+            }
+          }
+        },
+        {
+          "name": "Reporte domiciliarios",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/reports/deliverers/"
+          }
+        }
+      ]
+    }
+
+  ]
+}

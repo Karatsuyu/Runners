@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Runners API — runserver",
+			"type": "shell",
+			"command": "c:/Users/Usuario/Documents/runners/.venv/Scripts/python.exe manage.py runserver 0.0.0.0:8000",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
