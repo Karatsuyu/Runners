@@ -334,7 +334,10 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
           await showModalBottomSheet(
             context: context,
             isScrollControlled: true,
-            builder: (_) => _DeliveryChatSheet(deliveryId: created.id),
+            builder: (_) => _DeliveryChatSheet(
+              deliveryId: created.id,
+              peerLabel: created.delivererName,
+            ),
           );
         } else {
           // Start polling for assignment (every 5s), timeout after ~5 minutes
@@ -354,7 +357,10 @@ class _DeliveriesScreenState extends ConsumerState<DeliveriesScreen> {
                 await showModalBottomSheet(
                   context: context,
                   isScrollControlled: true,
-                  builder: (_) => _DeliveryChatSheet(deliveryId: found.id),
+                  builder: (_) => _DeliveryChatSheet(
+                    deliveryId: found.id,
+                    peerLabel: found.delivererName,
+                  ),
                 );
               } else if (attempts > 60) {
                 // timeout (~5 minutes)
@@ -770,20 +776,28 @@ class _DeliveryRequestCard extends StatelessWidget {
               }),
             ],
             const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => _DeliveryChatSheet(deliveryId: request.id),
-                  );
-                },
-                icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                label: const Text('Chat con Admin'),
+            if (request.delivererName != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openDeliveryChat(
+                    context,
+                    deliveryId: request.id,
+                    peerLabel: request.delivererName,
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text('Chat con repartidor'),
+                ),
+              )
+            else
+              Text(
+                'El chat se habilita cuando se asigne un repartidor',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color ??
+                      AppColors.textSecondary,
+                ),
               ),
-            ),
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(request.createdAt),
@@ -1455,6 +1469,19 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _openDeliveryChat(
+                  context,
+                  deliveryId: d.id,
+                  peerLabel: d.clientName,
+                ),
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Chat con cliente'),
+              ),
+            ),
           ],
         ),
       ),
@@ -1462,9 +1489,29 @@ class _ActiveDeliveryCardState extends ConsumerState<_ActiveDeliveryCard> {
   }
 }
 
+void _openDeliveryChat(
+  BuildContext context, {
+  required int deliveryId,
+  String? peerLabel,
+}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    builder: (_) => _DeliveryChatSheet(
+      deliveryId: deliveryId,
+      peerLabel: peerLabel,
+    ),
+  );
+}
+
 class _DeliveryChatSheet extends ConsumerStatefulWidget {
   final int deliveryId;
-  const _DeliveryChatSheet({required this.deliveryId});
+  final String? peerLabel;
+
+  const _DeliveryChatSheet({
+    required this.deliveryId,
+    this.peerLabel,
+  });
 
   @override
   ConsumerState<_DeliveryChatSheet> createState() => _DeliveryChatSheetState();
@@ -1472,25 +1519,126 @@ class _DeliveryChatSheet extends ConsumerStatefulWidget {
 
 class _DeliveryChatSheetState extends ConsumerState<_DeliveryChatSheet> {
   final _messageCtrl = TextEditingController();
+  final _scrollCtrl = ScrollController();
+  Timer? _pollTimer;
+  List<DeliveryChatMessageModel> _messages = [];
+  bool _loading = true;
   bool _sending = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) => _loadMessages(silent: true));
+  }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _messageCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
+  String _recipientRoleFor(UserEntity? user) {
+    switch (user?.role) {
+      case UserRole.CLIENTE:
+        return 'DOMICILIARIO';
+      case UserRole.DOMICILIARIO:
+        return 'CLIENTE';
+      case UserRole.ADMIN:
+        return 'CLIENTE';
+      default:
+        return 'DOMICILIARIO';
+    }
+  }
+
+  String _chatTitle(UserEntity? user) {
+    if (widget.peerLabel != null && widget.peerLabel!.trim().isNotEmpty) {
+      return 'Chat · ${widget.peerLabel}';
+    }
+    return switch (user?.role) {
+      UserRole.CLIENTE => 'Chat con tu repartidor',
+      UserRole.DOMICILIARIO => 'Chat con el cliente',
+      UserRole.ADMIN => 'Chat del domicilio',
+      _ => 'Chat de domicilio',
+    };
+  }
+
+  List<DeliveryChatMessageModel> _visibleMessages(
+    List<DeliveryChatMessageModel> all,
+    UserEntity? user,
+  ) {
+    if (user?.isAdmin ?? false) return all;
+    return all
+        .where((m) => m.isPeerConversation || m.isSystemNotice)
+        .toList();
+  }
+
+  Future<void> _loadMessages({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    }
+    try {
+      final list = await ref
+          .read(deliveriesDataSourceProvider)
+          .getDeliveryChat(widget.deliveryId);
+      if (!mounted) return;
+      setState(() {
+        _messages = list;
+        _loading = false;
+        _loadError = null;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = silent ? _loadError : '$e';
+      });
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollCtrl.hasClients) return;
+      _scrollCtrl.animateTo(
+        _scrollCtrl.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
   Future<void> _send() async {
-    if (_messageCtrl.text.trim().isEmpty) return;
+    final text = _messageCtrl.text.trim();
+    if (text.isEmpty) return;
+
+    final user = ref.read(authProvider).user;
+    final recipientRole = _recipientRoleFor(user);
+
     setState(() => _sending = true);
     try {
       await ref.read(deliveriesDataSourceProvider).sendDeliveryChatMessage(
             id: widget.deliveryId,
-            message: _messageCtrl.text.trim(),
-            recipientRole: 'ADMIN',
+            message: text,
+            recipientRole: recipientRole,
           );
       _messageCtrl.clear();
-      setState(() {});
+      await _loadMessages(silent: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No se pudo enviar: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -1498,51 +1646,181 @@ class _DeliveryChatSheetState extends ConsumerState<_DeliveryChatSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.75,
-      child: FutureBuilder<List<DeliveryChatMessageModel>>(
-        future: ref.read(deliveriesDataSourceProvider).getDeliveryChat(widget.deliveryId),
-        builder: (context, snapshot) {
-          final messages = snapshot.data ?? const <DeliveryChatMessageModel>[];
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                const Text('Chat de domicilio', style: TextStyle(fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: messages.isEmpty
-                      ? const Center(child: Text('Sin mensajes todavía'))
-                      : ListView.builder(
-                          itemCount: messages.length,
-                          itemBuilder: (_, i) {
-                            final m = messages[i];
-                            return ListTile(
-                              dense: true,
-                              title: Text(m.senderName),
-                              subtitle: Text(m.message),
-                            );
-                          },
-                        ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _messageCtrl,
-                        decoration: const InputDecoration(hintText: 'Escribe un mensaje'),
+    final user = ref.watch(authProvider).user;
+    final visible = _visibleMessages(_messages, user);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.78,
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _chatTitle(user),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
-                    IconButton(
-                      onPressed: _sending ? null : _send,
-                      icon: const Icon(Icons.send),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                  IconButton(
+                    tooltip: 'Actualizar',
+                    onPressed: _loading ? null : () => _loadMessages(),
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
+            const Divider(height: 1),
+            Expanded(
+              child: _loading && visible.isEmpty
+                  ? const Center(child: AppLoading())
+                  : _loadError != null && visible.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              _loadError!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ),
+                        )
+                      : visible.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'Escribe el primer mensaje para coordinar el domicilio',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: AppColors.textSecondary),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollCtrl,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              itemCount: visible.length,
+                              itemBuilder: (_, i) {
+                                final m = visible[i];
+                                final isMine = user != null && m.senderId == user.id;
+                                final isNotice = m.isSystemNotice;
+
+                                return Align(
+                                  alignment: isMine
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    constraints: BoxConstraints(
+                                      maxWidth:
+                                          MediaQuery.of(context).size.width * 0.78,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isNotice
+                                          ? AppColors.warning.withValues(alpha: 0.15)
+                                          : isMine
+                                              ? AppColors.primaryGreen
+                                                  .withValues(alpha: 0.15)
+                                              : Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: isMine
+                                          ? CrossAxisAlignment.end
+                                          : CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          isNotice
+                                              ? 'Runners'
+                                              : m.senderName,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: isNotice
+                                                ? AppColors.warning
+                                                : AppColors.primaryGreen,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(m.message),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          AppFormatters.dateTime(m.createdAt),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Theme.of(context)
+                                                    .textTheme
+                                                    .bodySmall
+                                                    ?.color ??
+                                                AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageCtrl,
+                      minLines: 1,
+                      maxLines: 4,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sending ? null : _send(),
+                      decoration: InputDecoration(
+                        hintText: user?.isAdmin ?? false
+                            ? 'Mensaje al cliente'
+                            : 'Escribe un mensaje',
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _sending ? null : _send,
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1728,6 +2006,19 @@ class _DeliveryHistoryCard extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => _openDeliveryChat(
+                  context,
+                  deliveryId: delivery.id,
+                  peerLabel: delivery.clientName,
+                ),
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Chat con cliente'),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               AppFormatters.dateTime(delivery.createdAt),

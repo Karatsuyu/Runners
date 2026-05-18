@@ -158,14 +158,18 @@ class DeliveryRequestModel {
 
 class DeliveryChatMessageModel {
   final int id;
+  final int senderId;
   final String senderName;
+  final String senderRole;
   final String recipientRole;
   final String message;
   final String createdAt;
 
   const DeliveryChatMessageModel({
     required this.id,
+    required this.senderId,
     required this.senderName,
+    required this.senderRole,
     required this.recipientRole,
     required this.message,
     required this.createdAt,
@@ -174,11 +178,21 @@ class DeliveryChatMessageModel {
   factory DeliveryChatMessageModel.fromJson(Map<String, dynamic> j) =>
       DeliveryChatMessageModel(
         id: j['id'] as int,
+        senderId: j['sender'] as int? ?? 0,
         senderName: j['sender_name'] as String? ?? '',
-        recipientRole: j['recipient_role'] as String? ?? '',
+        senderRole: (j['sender_role'] as String? ?? '').toUpperCase(),
+        recipientRole: (j['recipient_role'] as String? ?? '').toUpperCase(),
         message: j['message'] as String? ?? '',
         createdAt: j['created_at'] as String? ?? '',
       );
+
+  bool get isPeerConversation =>
+      (senderRole == 'CLIENTE' && recipientRole == 'DOMICILIARIO') ||
+      (senderRole == 'DOMICILIARIO' && recipientRole == 'CLIENTE');
+
+  bool get isSystemNotice =>
+      senderRole == 'ADMIN' &&
+      (recipientRole == 'CLIENTE' || recipientRole == 'DOMICILIARIO');
 }
 
 class FinancialRecordModel {

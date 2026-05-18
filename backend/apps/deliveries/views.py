@@ -225,11 +225,15 @@ class DeliveryStatusToggleSerializer(serializers.Serializer):
 
 class DeliveryChatMessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.CharField(source='sender.get_full_name', read_only=True)
+    sender_role = serializers.CharField(source='sender.role', read_only=True)
 
     class Meta:
         model = DeliveryChatMessage
-        fields = ['id', 'delivery_request', 'sender', 'sender_name', 'recipient_role', 'message', 'created_at']
-        read_only_fields = ['id', 'delivery_request', 'sender', 'sender_name', 'created_at']
+        fields = [
+            'id', 'delivery_request', 'sender', 'sender_name', 'sender_role',
+            'recipient_role', 'message', 'created_at',
+        ]
+        read_only_fields = ['id', 'delivery_request', 'sender', 'sender_name', 'sender_role', 'created_at']
 
 
 class DeliveryZoneSerializer(serializers.ModelSerializer):
@@ -652,9 +656,16 @@ class DeliveryChatListCreateView(generics.ListCreateAPIView):
             (User.Role.ADMIN, User.Role.CLIENTE),
             (User.Role.ADMIN, User.Role.DOMICILIARIO),
             (User.Role.DOMICILIARIO, User.Role.ADMIN),
+            (User.Role.CLIENTE, User.Role.DOMICILIARIO),
+            (User.Role.DOMICILIARIO, User.Role.CLIENTE),
         }
         if (sender_role, recipient_role) not in allowed_pairs:
             raise serializers.ValidationError('Combinación de roles no permitida para chat.')
+        if sender_role in (User.Role.CLIENTE, User.Role.DOMICILIARIO):
+            if not delivery.deliverer_id:
+                raise serializers.ValidationError(
+                    'El chat con el repartidor estará disponible cuando se asigne un domiciliario.'
+                )
         serializer.save(delivery_request=delivery, sender=self.request.user)
 
 

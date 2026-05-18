@@ -295,6 +295,8 @@ class DeliveryChatMessage(models.Model):
             (User.Role.ADMIN, User.Role.CLIENTE),
             (User.Role.ADMIN, User.Role.DOMICILIARIO),
             (User.Role.DOMICILIARIO, User.Role.ADMIN),
+            (User.Role.CLIENTE, User.Role.DOMICILIARIO),
+            (User.Role.DOMICILIARIO, User.Role.CLIENTE),
         }
         if (sender_role, self.recipient_role) not in allowed_pairs:
             raise ValidationError('Combinación de roles no permitida para chat de domicilios.')
