@@ -7,85 +7,92 @@ Listas para importar directamente como tareas en **ClickUp**. Cada una con 5 a 6
 
 ## 🏗️ ÉPICA 01: Core & Configuración
 
-### HU-01: Splash Screen con verificación de sesión
-**Descripción:** Como sistema, necesito mostrar una pantalla de carga inicial mientras verifico si el usuario ya posee un token válido guardado, para dirigirlo al Login o a su módulo correspondiente.
-**Puntos:** 1 | **Prioridad:** Alta
+### HU-01: Registro de Usuario (Cliente)
+**Descripción:** Como prospecto cliente, necesito registrarme en la app con mis datos para crear una cuenta y acceder al sistema.
+**Puntos:** 2 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Al abrir la app, la pantalla de Splash se muestra al menos por 1-2 segundos exhibiendo el logo de Runners centrado correctamente.
-*   [ ] CA2: El sistema consulta el SecureStorage para buscar la persistencia del `access_token` JWT. Si no existe, al terminar el tiempo redirige a /login.
-*   [ ] CA3: Si el token existe y es válido, decodifica el atributo Rol para calcular la redirección final (Dashboard Admin vs Vista Cliente).
-*   [ ] CA4: Si el token ha expirado durante el estado offline, reintenta transparentemente el uso del `refresh_token` antes de expulsar al usuario.
-*   [ ] CA5: En el caso de que la validación falle corruptamente, la excepción es atrapada en el provider emitiendo rediseño hacia la ruta base pública.
+*   [ ] CA1: El formulario de registro solicita email, contraseña, confirmación de contraseña, nombre, apellido y teléfono (6 campos).
+*   [ ] CA2: Las validaciones verifican que el email no esté registrado, las contraseñas coincidan y cumplan con requisitos mínimos.
+*   [ ] CA3: Un registro exitoso crea el usuario en la BD con rol CLIENTE por defecto y redirige a Login.
+*   [ ] CA4: Los errores del backend (email duplicado, etc.) se muestran al usuario de forma clara.
+*   [ ] CA5: La página es responsive y funciona en móvil, tablet y desktop.
 
 **Definition of Done (DoD):**
-*   [ ] CA cumplidos y verificados (todos).
-*   [ ] Código en repositorio (commit/push) y ejecuta sin errores en consola/terminal.
-*   [ ] Pruebas básicas realizadas (manual o automatizada) con evidencia.
-*   [ ] Validaciones implementadas y manejo de errores visible al usuario.
-*   [ ] Control de acceso por roles aplicado (manejo en BBDD y serializador de datos).
-*   [ ] Datos persistidos correctamente y verificados directamente en la BBDD.
-*   [ ] Evidencia adjunta: capturas, video corto o link demo + datos de prueba.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de registro con múltiples casos realizadas.
+*   [ ] Validaciones de formulario implementadas correctamente.
+*   [ ] Usuario persistido correctamente en BD (Django Admin verificado).
+*   [ ] Roles y reglas de negocio aplicadas (rol CLIENTE asignado automáticamente).
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-02: Configuración Dio + interceptores JWT
-**Descripción:** Como desarrollador, necesito instanciar el cliente HTTP Dio global con interceptores que inyecten el Bearer Token en cada salto para mantener estandarizadas las peticiones.
-**Puntos:** 3 | **Prioridad:** Alta
+---
+
+### HU-02: Login de Usuario
+**Descripción:** Como usuario registrado, necesito iniciar sesión con mis credenciales (email y contraseña) para acceder a mi módulo correspondiente según mi rol.
+**Puntos:** 2 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: La instancia base de Dio añade por defecto la cabecera `Authorization: Bearer <token>` cuando el destino es la capa `/api/`.
-*   [ ] CA2: Al recibir respuetas globales tipo HTTP 401 Unauthorized, un interceptor actúa renovando el access_token mediante el endpoint de Refresh de Django.
-*   [ ] CA3: Tras una renovación exitosa en segundo plano, la petición frenada repite él mismo request subyacente sin que el usuario cliente perciba la caída.
-*   [ ] CA4: Un error prolongado tras el Refresh Token (Ej. Cuenta baneada, 403 o RefreshExpirado) forzará un "Force 로그out" expulsando variables de memoria.
-*   [ ] CA5: Los logs de terminal (Dio Logger) ocultan tokens parcialmente en ambientes de Producción por reglas de seguridad y confidencialidad celular.
+*   [ ] CA1: El formulario de login solicita email y contraseña con validación de campos vacíos.
+*   [ ] CA2: El sistema consulta el endpoint `/api/v1/auth/login/` y retorna `access_token` + `refresh_token` si las credenciales son válidas.
+*   [ ] CA3: Los tokens se guardan de forma segura en `SecureStorage` tras un login exitoso.
+*   [ ] CA4: Un login exitoso redirige al usuario al dashboard correspondiente según su rol (ADMIN → AdminDashboard, CLIENTE → StorePage, etc.).
+*   [ ] CA5: Credenciales inválidas muestran un error claro sin exponer detalles del backend.
 
 **Definition of Done (DoD):**
-*   [ ] CA cumplidos y verificados (todos).
-*   [ ] Código en repositorio (commit/push) y ejecuta sin errores en consola/terminal.
-*   [ ] Pruebas básicas realizadas (manual o automatizada) con evidencia.
-*   [ ] Validaciones implementadas y manejo de errores visible al usuario.
-*   [ ] Control de acceso por roles aplicado (manejo en BBDD y serializador de datos).
-*   [ ] Datos persistidos correctamente y verificados directamente en la BBDD.
-*   [ ] Evidencia adjunta: capturas, video corto o link demo + datos de prueba.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de login exitoso y fallido realizadas.
+*   [ ] Almacenamiento seguro de tokens verificado.
+*   [ ] Redirección por rol funcional en los 4 roles (Admin, Cliente, Prestador, Domiciliario).
+*   [ ] AuthContext implementado y compartido entre componentes.
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-03: SecureStorage para tokens
-**Descripción:** Como arquitecto Flutter, aseguraré que los secretos de la sesión estén acartonados en el KeyStore nativo de iOS y SharedPreferences en vez de Hive en texto plano.
-**Puntos:** 1 | **Prioridad:** Alta
+---
+
+### HU-03: Logout de Usuario
+### HU-03: Logout de Usuario
+**Descripción:** Como usuario autenticado, necesito poder cerrar sesión para salir de la app de forma segura y completa.
+**Puntos:** 0.5 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Las credenciales extraídas en login (`access`, `refresh`) se graban mediante package FlutterSecureStorage. Ningún token reside expuesto a exploradores root.
-*   [ ] CA2: Invocar un read() sobre un key vacío retorna un null mapeado controlado sin causar NullPointer exceptions en la consola.
-*   [ ] CA3: Acción DeleteAll() garantiza purgar el compartimiento nativo al realizar cierre de sesión.
-*   [ ] CA4: El sistema en Android maneja la encriptación por hardware y auto regenera su llave keystore fallando silencioso de forma segura si la versión SO lo requiere.
-*   [ ] CA5: Cualquier actualización del Refresh expulsa el Value anterior sobrescribiéndose correctamente sin acumular copias residuales en memoria del hardware.
+*   [ ] CA1: El botón "Salir" en Navbar ejecuta el endpoint `/api/v1/auth/logout/` para añadir el token a una blacklist.
+*   [ ] CA2: Tras el logout, los tokens se eliminan completamente del `SecureStorage`.
+*   [ ] CA3: El usuario es redirigido inmediatamente a la pantalla de Login.
+*   [ ] CA4: Una vez deslogueado, el token anterior no puede ser reutilizado aunque tenga validez técnica.
+*   [ ] CA5: El cierre de sesión es visible al usuario (mensaje de confirmación o redirección limpia).
 
 **Definition of Done (DoD):**
-*   [ ] CA cumplidos y verificados (todos).
-*   [ ] Código en repositorio (commit/push) y ejecuta sin errores en consola/terminal.
-*   [ ] Pruebas básicas realizadas (manual o automatizada) con evidencia.
-*   [ ] Validaciones implementadas y manejo de errores visible al usuario.
-*   [ ] Control de acceso por roles aplicado (manejo en BBDD y serializador de datos).
-*   [ ] Datos persistidos correctamente y verificados directamente en la BBDD.
-*   [ ] Evidencia adjunta: capturas, video corto o link demo + datos de prueba.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de logout e invalidación de token realizadas.
+*   [ ] Limpieza completa de sesión verificada en SecureStorage.
+*   [ ] Tokens en blacklist no permiten acceso a recursos protegidos.
+*   [ ] Redirección a Login funcional y sin errores.
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-04: GoRouter con guards por rol
-**Descripción:** Como cliente/proveedor, el sistema debe prohibirme la ruta si digito accesos no contemplados de mi respectiva clase evitando vulnerabilidades inter-app.
-**Puntos:** 3 | **Prioridad:** Alta
+---
+
+### HU-04: Gestión de Roles y Control de Acceso
+**Descripción:** Como sistema, debo implementar un control de acceso basado en roles para proteger recursos y funcionalidades según el perfil del usuario (Admin, Cliente, Prestador, Domiciliario).
+**Puntos:** 1 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Las rutas GoRouter manejan un parámetro `redirect:` que evalúa constantemente el estado logueado del AuthProvider en Riverpod.
-*   [ ] CA2: Si un token no registra ser Admin, todo intento visual de ingresar a `/admin_dashboard` se sustituye agresivamente devolviéndolo a `/home`.
-*   [ ] CA3: Las rutas `/login` o `/register` no son accesibles si el estado Auth persiste "Authenticated". El usuario rebota automáticamente hacia adentro.
-*   [ ] CA4: El enrutador encapsula un ShellRoute que mantiene la barra de navegación de pie sin destruirla entre pantallas dependientes (Nested Navigation).
-*   [ ] CA5: De no hallarse una sub-ruta válida dentro de las declaraciones (Ej. link trunco web), se levanta la vista Error404 nativa "Ruta No hallada" conteniendo el appbar.
+*   [ ] CA1: El backend define 6 clases de permisos (IsAdmin, IsClient, IsProvider, IsDeliverer, IsAuthenticated, IsPublic).
+*   [ ] CA2: Cada vista protegida valida el rol del usuario antes de permitir acceso o modificación.
+*   [ ] CA3: El frontend implementa ProtectedRoute.jsx que verifica el rol antes de renderizar cada componente.
+*   [ ] CA4: AppRouter.jsx genera rutas protegidas dinámicamente basadas en los roles permitidos.
+*   [ ] CA5: Un usuario sin rol apropiado recibe error 403 en backend y redirección a acceso denegado en frontend.
 
 **Definition of Done (DoD):**
-*   [ ] CA cumplidos y verificados (todos).
-*   [ ] Código en repositorio (commit/push) y ejecuta sin errores en consola/terminal.
-*   [ ] Pruebas básicas realizadas (manual o automatizada) con evidencia.
-*   [ ] Validaciones implementadas y manejo de errores visible al usuario.
-*   [ ] Control de acceso por roles aplicado (manejo en BBDD y serializador de datos).
-*   [ ] Datos persistidos correctamente y verificados directamente en la BBDD.
-*   [ ] Evidencia adjunta: capturas, video corto o link demo + datos de prueba.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Criterios de aceptación cumplidos y verificados.
+*   [ ] Código integrado en el repositorio y ejecuta sin errores.
+*   [ ] Pruebas de acceso por rol realizadas para los 4 roles.
+*   [ ] Validaciones en backend + frontend sincronizadas.
+*   [ ] Rutas protegidas funcionan correctamente según rol.
+*   [ ] Accesos no autorizados retornan errores controlados.
+*   [ ] Evidencia adjunta: capturas de pantalla probando los 4 roles y accesos denegados.
+*   [ ] Documentación mínima actualizada en README.
 
 ---
 
@@ -142,14 +149,13 @@ Listas para importar directamente como tareas en **ClickUp**. Cada una con 5 a 6
 *   [ ] CA5: Si disponía de socket activo u polling rastreando Domicilios, se envía signal Cancel al timer frenando el hilo asincrónico.
 
 **Definition of Done (DoD):**
-*   [ ] CA observados todos.
-*   [ ] Git Comiteado sin issues de render.
-*   [ ] Unit test verificado.
-*   [ ] Validaciones en forms no corrompidas.
-*   [ ] Protección final anti rebotes lógicos.
-*   [ ] BD desancló el Refresh.
-*   [ ] Evidencias anexas.
-*   [ ] Doc de usuario actual.
+*   [ ] CA1 a CA5 verificados para el cierre de sesión.
+*   [ ] El logout invoca el endpoint `/api/v1/auth/logout/` y blacklistea el refresh token cuando existe.
+*   [ ] `SecureStorage` limpia `accessToken`, `refreshToken`, `userRole` y `userId` tras cerrar sesión.
+*   [ ] La interfaz redirige a Login y no permite volver a pantallas protegidas con la sesión anterior.
+*   [ ] El estado de autenticación se reinicia correctamente en Riverpod sin dejar usuario activo.
+*   [ ] Evidencia de la prueba manual del logout adjunta (captura o video).
+*   [ ] Documentación de usuario actualizada si cambió el flujo visible.
 
 ### HU-08: Navegación por rol (BottomNav diferenciado)
 **Descripción:** Como usuario segmentado al ingresar a mi hogar panel solo quiero percibir el Scaffold Shell relativo a mi rubro evitando sub paneles basuras.
@@ -511,3 +517,22 @@ Listas para importar directamente como tareas en **ClickUp**. Cada una con 5 a 6
 *   [ ] Documentación mínima actualizada.
 
 *(Nota: Adicionalmente, todas las historias aplican un criterio exhaustivo de DoD enfocado en la completitud de código, tests en BBDD y manejos resilientes de conectividad base según lo exigido por el estándar ágil del formato maestro final de Runners.)*
+
+
+
+## 🧱 Sprint 1 — Infraestructura + Autenticación (3 semanas | 12 pts)
+
+### Semana 1: Setup del proyecto
+
+| Tarea | Responsable | Horas | Pts | Etiqueta | Prioridad | Estado |
+|------|-------------|-------|-----|----------|-----------|--------|
+| Crear repo GitHub, estructura de carpetas, README | Laura (PM) | 4h | 0.5 | pm config | 🔴 Urgente | ✅ Hecho |
+| Inicializar proyecto Django + settings (base, dev, prod) | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+| Configurar \.env\, CORS, INSTALLED_APPS, SimpleJWT | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+| Inicializar proyecto React + Vite, configurar eslint | Alison (Frontend) | 4h | 0.5 | frontend config | 🔴 Urgente | ✅ Hecho |
+| Configurar Axios con interceptor de refresh token | Alison (Frontend) | 4h | 0.5 | frontend config | 🔴 Urgente | ✅ Hecho |
+| Crear tablero en ClickUp, definir columnas y etiquetas | Laura (PM) | 4h | 0.5 | pm | 🟠 Alta | ✅ Hecho |
+| Modelo User personalizado (AbstractBaseUser + roles) | Julian (Backend) | 8h | 1 | backend | 🔴 Urgente | ✅ Hecho |
+| Crear UserManager, migraciones, superuser | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+
+**Subtotal Semana 1:** 36h | 4.5 pts

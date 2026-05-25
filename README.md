@@ -258,6 +258,12 @@ gunicorn runners_project.wsgi:application
 - Convención de ramas: `feature/*`, `fix/*`, `refactor/*`, `docs/*`, `chore/*`, `hotfix/*`
 - Política recomendada: no desarrollar directo en `main`; trabajar con PR y revisión
 
+## 👥 Integrantes del equipo
+
+- Julian Estiven Gutierrez Tabares - Líder / Gerente de Proyecto, Backend, Base de Datos y QA / Pruebas
+- Laura Sofia Bueno Rincon - Frontend / UX
+- Alison Tatiana Chamorro - Backend, Base de Datos y Frontend / UX
+
 ## 📄 Licencia
 
 Proyecto privado - Caicedonia, Valle del Cauca 2026

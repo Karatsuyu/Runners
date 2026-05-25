@@ -4522,7 +4522,9 @@ mindmap
 
 ---
 
-## 🧱 Sprint 1 - Semana 1: Setup del proyecto
+## 🧱 Sprint 1 — Infraestructura + Autenticación (3 semanas | 12 pts)
+
+### Semana 1: Setup del proyecto
 
 | Tarea | Responsable | Horas | Pts | Etiqueta | Prioridad | Estado |
 |------|-------------|-------|-----|----------|-----------|--------|
@@ -4539,85 +4541,125 @@ mindmap
 
 ---
 
+### Semana 2: HU-01 Registro + HU-02 Login
+
+| Tarea | Responsable | Horas | Pts | Etiqueta | Prioridad | Estado |
+|------|-------------|-------|-----|----------|-----------|--------|
+| HU-01 — UserRegisterSerializer + RegisterView | Julian (Backend) | 4h | 0.5 | backend | 🔴 Urgente | ✅ Hecho |
+| HU-01 — Endpoint POST /api/v1/auth/register/ + test Postman | Julian (Backend) | 4h | 0.5 | backend qa | 🔴 Urgente | ✅ Hecho |
+| HU-01 — Página Register.jsx (formulario 6 campos, validación) | Alison (Frontend) | 8h | 1 | frontend | 🔴 Urgente | ✅ Hecho |
+| HU-02 — Configurar TokenObtainPairView + TokenRefreshView | Julian (Backend) | 4h | 0.5 | backend config | 🔴 Urgente | ✅ Hecho |
+| HU-02 — UserProfileSerializer + UserProfileView (GET/PATCH) | Julian (Backend) | 4h | 0.5 | backend | 🔴 Urgente | ✅ Hecho |
+| HU-02 — Página Login.jsx + integración AuthContext | Laura (Frontend) | 8h | 1 | frontend | 🔴 Urgente | ✅ Hecho |
+| HU-02 — AuthContext.jsx (login, register, logout, loadUser) | Alison (Frontend) | 8h | 1 | frontend | 🔴 Urgente | ✅ Hecho |
+| Diseñar Navbar.jsx con enlaces condicionales por rol | Laura (Frontend/UX) | 4h | 0.5 | frontend ux | 🟠 Alta | ✅ Hecho |
+
+**Subtotal Semana 2:** 44h | 5.5 pts
+
+---
+
+### Semana 3: HU-03 Logout + HU-04 Roles + QA
+
+| Tarea | Responsable | Horas | Pts | Etiqueta | Prioridad | Estado |
+|------|-------------|-------|-----|----------|-----------|--------|
+| HU-03 — Configurar token_blacklist + endpoint logout | Julian (Backend) | 4h | 0.5 | backend | 🔴 Urgente | ✅ Hecho |
+| HU-03 — Botón Salir en Navbar + lógica de limpieza | Laura (Frontend) | 4h | 0.5 | frontend | 🔴 Urgente | ✅ Hecho |
+| HU-04 — 6 clases de permisos en permissions.py | Julian (Backend) | 4h | 0.5 | backend | 🔴 Urgente | ✅ Hecho |
+| HU-04 — ProtectedRoute.jsx con verificación de roles | Alison (Frontend) | 4h | 0.5 | frontend | 🔴 Urgente | ✅ Hecho |
+| HU-04 — AppRouter.jsx con rutas protegidas por rol | Alison (Frontend) | 4h | 0.5 | frontend | 🔴 Urgente | ✅ Hecho |
+| Diseñar Footer.jsx, LoadingSpinner, ErrorMessage | Laura (Frontend/UX) | 4h | 0.5 | frontend ux | 🟡 Normal | ✅ Hecho |
+| QA — Pruebas E2E: registro, login, logout, roles | Julian (QA) | 8h | 1 | qa | 🟠 Alta | ✅ Hecho |
+| QA — Validar interceptor de refresh token | Julian (QA) | 4h | 0.5 | qa | 🟠 Alta | ✅ Hecho |
+| Sprint Review + Retrospectiva | Laura (PM) | 2h | 0.25 | pm | 🟡 Normal | ✅ Hecho |
+
+**Subtotal Semana 3:** 38h | 4.75 pts
+
+---
+
+**📊 Sprint 1 Total: 118h | 12 pts**
+**Demo:** Login/Registro/Logout con 4 roles funcionando. ✅ Completado
+
+---
+
 ## 📘 Historias de Usuario Detalladas (CA y DoD)
 
 > Esta sección complementa el backlog inicial sin modificarlo. Aquí quedan consolidadas las historias con sus criterios de aceptación y su Definition of Done para usarlas como base de implementación y seguimiento en ClickUp.
 
-### HU-01: Splash Screen con verificación de sesión
-**Descripción:** Como sistema, necesito mostrar una pantalla de carga inicial mientras verifico si el usuario ya posee un token válido guardado, para dirigirlo al Login o a su módulo correspondiente.
-**Puntos:** 1 | **Prioridad:** Alta
+### HU-01: Registro de Usuario (Cliente)
+**Descripción:** Como prospecto cliente, necesito registrarme en la app con mis datos para crear una cuenta y acceder al sistema.
+**Puntos:** 2 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Al abrir la app, la pantalla Splash se muestra al menos por 1-2 segundos con el logo de Runners centrado correctamente.
-*   [ ] CA2: El sistema consulta `SecureStorage` para detectar la persistencia del `access_token` JWT.
-*   [ ] CA3: Si el token existe y es válido, se decodifica el rol para redirigir al dashboard correspondiente.
-*   [ ] CA4: Si el token ha expirado, se intenta renovar con `refresh_token` antes de expulsar al usuario.
-*   [ ] CA5: Si la validación falla, la app redirige a la ruta pública sin cerrar de forma inesperada.
+*   [ ] CA1: El formulario de registro solicita email, contraseña, confirmación de contraseña, nombre, apellido y teléfono (6 campos).
+*   [ ] CA2: Las validaciones verifican que el email no esté registrado, las contraseñas coincidan y cumplan con requisitos mínimos.
+*   [ ] CA3: Un registro exitoso crea el usuario en la BD con rol CLIENTE por defecto y redirige a Login.
+*   [ ] CA4: Los errores del backend (email duplicado, etc.) se muestran al usuario de forma clara.
+*   [ ] CA5: La página es responsive y funciona en móvil, tablet y desktop.
 **Definition of Done (DoD):**
 *   [ ] Criterios de aceptación cumplidos y verificados.
 *   [ ] Código integrado en el repositorio y ejecuta sin errores.
-*   [ ] Pruebas funcionales básicas realizadas con evidencia.
-*   [ ] Manejo de errores y estados vacíos visible al usuario.
-*   [ ] Persistencia y lectura de sesión verificada.
-*   [ ] Control de acceso por roles aplicado donde corresponda.
-*   [ ] Evidencia adjunta: capturas, video o demo.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Pruebas de registro con múltiples casos realizadas.
+*   [ ] Validaciones de formulario implementadas correctamente.
+*   [ ] Usuario persistido correctamente en BD (Django Admin verificado).
+*   [ ] Roles y reglas de negocio aplicadas (rol CLIENTE asignado automáticamente).
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-02: Configuración Dio + interceptores JWT
-**Descripción:** Como desarrollador, necesito instanciar el cliente HTTP Dio con interceptores para inyectar el Bearer Token y refrescar la sesión automáticamente.
-**Puntos:** 3 | **Prioridad:** Alta
+### HU-02: Login de Usuario
+**Descripción:** Como usuario registrado, necesito iniciar sesión con mis credenciales (email y contraseña) para acceder a mi módulo correspondiente según mi rol.
+**Puntos:** 2 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: La instancia base de Dio agrega `Authorization: Bearer <token>` a las peticiones de la capa `/api/`.
-*   [ ] CA2: Ante un HTTP 401, el interceptor intenta renovar el `access_token` con el endpoint de refresh.
-*   [ ] CA3: Si la renovación es exitosa, la petición original se reintenta sin intervención del usuario.
-*   [ ] CA4: Si el refresh falla, se limpia la sesión y se fuerza cierre de sesión.
-*   [ ] CA5: Los logs no exponen tokens completos en entornos de producción.
+*   [ ] CA1: El formulario de login solicita email y contraseña con validación de campos vacíos.
+*   [ ] CA2: El sistema consulta el endpoint `/api/v1/auth/login/` y retorna `access_token` + `refresh_token` si las credenciales son válidas.
+*   [ ] CA3: Los tokens se guardan de forma segura en `SecureStorage` tras un login exitoso.
+*   [ ] CA4: Un login exitoso redirige al usuario al dashboard correspondiente según su rol (ADMIN → AdminDashboard, CLIENTE → StorePage, etc.).
+*   [ ] CA5: Credenciales inválidas muestran un error claro sin exponer detalles del backend.
 **Definition of Done (DoD):**
 *   [ ] Criterios de aceptación cumplidos y verificados.
 *   [ ] Código integrado en el repositorio y ejecuta sin errores.
-*   [ ] Pruebas de autenticación y refresh ejecutadas.
-*   [ ] Manejo de errores visible y controlado.
-*   [ ] Persistencia y renovación de sesión verificadas.
-*   [ ] Reglas de seguridad aplicadas en los encabezados y logs.
-*   [ ] Evidencia adjunta: capturas, video o demo.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Pruebas de login exitoso y fallido realizadas.
+*   [ ] Almacenamiento seguro de tokens verificado.
+*   [ ] Redirección por rol funcional en los 4 roles (Admin, Cliente, Prestador, Domiciliario).
+*   [ ] AuthContext implementado y compartido entre componentes.
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-03: SecureStorage para tokens
-**Descripción:** Como arquitecto Flutter, necesito guardar los tokens de sesión de forma segura en almacenamiento cifrado del dispositivo.
-**Puntos:** 1 | **Prioridad:** Alta
+### HU-03: Logout de Usuario
+**Descripción:** Como usuario autenticado, necesito poder cerrar sesión para salir de la app de forma segura y completa.
+**Puntos:** 0.5 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Los tokens `access` y `refresh` se guardan con `flutter_secure_storage`.
-*   [ ] CA2: La lectura de una clave inexistente devuelve `null` de forma controlada.
-*   [ ] CA3: El cierre de sesión elimina por completo las credenciales guardadas.
-*   [ ] CA4: La actualización del refresh token sobrescribe el valor anterior sin duplicados.
-*   [ ] CA5: No se almacenan tokens en texto plano ni en almacenamiento inseguro.
+*   [ ] CA1: El botón "Salir" en Navbar ejecuta el endpoint `/api/v1/auth/logout/` para añadir el token a una blacklist.
+*   [ ] CA2: Tras el logout, los tokens se eliminan completamente del `SecureStorage`.
+*   [ ] CA3: El usuario es redirigido inmediatamente a la pantalla de Login.
+*   [ ] CA4: Una vez deslogueado, el token anterior no puede ser reutilizado aunque tenga validez técnica.
+*   [ ] CA5: El cierre de sesión es visible al usuario (mensaje de confirmación o redirección limpia).
 **Definition of Done (DoD):**
 *   [ ] Criterios de aceptación cumplidos y verificados.
 *   [ ] Código integrado en el repositorio y ejecuta sin errores.
-*   [ ] Pruebas de persistencia segura realizadas.
-*   [ ] Manejo de errores y null-safety verificado.
-*   [ ] Seguridad de credenciales confirmada.
-*   [ ] Persistencia validada en el dispositivo o emulador.
-*   [ ] Evidencia adjunta: capturas, video o demo.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Pruebas de logout e invalidación de token realizadas.
+*   [ ] Limpieza completa de sesión verificada en SecureStorage.
+*   [ ] Tokens en blacklist no permiten acceso a recursos protegidos.
+*   [ ] Redirección a Login funcional y sin errores.
+*   [ ] Evidencia adjunta: capturas de pantalla y video del flujo.
+*   [ ] Documentación mínima actualizada en README.
 
-### HU-04: GoRouter con guards por rol
-**Descripción:** Como cliente/proveedor, el sistema debe bloquear rutas no autorizadas según el rol autenticado.
-**Puntos:** 3 | **Prioridad:** Alta
+### HU-04: Gestión de Roles y Control de Acceso
+**Descripción:** Como sistema, debo implementar un control de acceso basado en roles para proteger recursos y funcionalidades según el perfil del usuario (Admin, Cliente, Prestador, Domiciliario).
+**Puntos:** 1 | **Prioridad:** Urgente
 **Criterios de Aceptación:**
-*   [ ] CA1: Las rutas usan `redirect` para evaluar el estado de autenticación.
-*   [ ] CA2: Un usuario sin rol Admin no puede entrar a rutas administrativas.
-*   [ ] CA3: Las rutas públicas de login y registro no están disponibles para usuarios autenticados.
-*   [ ] CA4: La navegación mantiene el shell o layout principal sin reinicios innecesarios.
-*   [ ] CA5: Las rutas inexistentes muestran una pantalla de error controlada.
+*   [ ] CA1: El backend define 6 clases de permisos (IsAdmin, IsClient, IsProvider, IsDeliverer, IsAuthenticated, IsPublic).
+*   [ ] CA2: Cada vista protegida valida el rol del usuario antes de permitir acceso o modificación.
+*   [ ] CA3: El frontend implementa ProtectedRoute.jsx que verifica el rol antes de renderizar cada componente.
+*   [ ] CA4: AppRouter.jsx genera rutas protegidas dinámicamente basadas en los roles permitidos.
+*   [ ] CA5: Un usuario sin rol apropiado recibe error 403 en backend y redirección a acceso denegado en frontend.
 **Definition of Done (DoD):**
 *   [ ] Criterios de aceptación cumplidos y verificados.
 *   [ ] Código integrado en el repositorio y ejecuta sin errores.
-*   [ ] Pruebas de navegación y redirección realizadas.
-*   [ ] Manejo de errores y rutas inválidas implementado.
-*   [ ] Restricciones por rol verificadas.
-*   [ ] Persistencia de sesión respetada en la navegación.
-*   [ ] Evidencia adjunta: capturas, video o demo.
-*   [ ] Documentación mínima actualizada.
+*   [ ] Pruebas de acceso por rol realizadas para los 4 roles.
+*   [ ] Validaciones en backend + frontend sincronizadas.
+*   [ ] Rutas protegidas funcionan correctamente según rol.
+*   [ ] Accesos no autorizados retornan errores controlados.
+*   [ ] Evidencia adjunta: capturas de pantalla probando los 4 roles y accesos denegados.
+*   [ ] Documentación mínima actualizada en README.
 
 ### HU-05: Pantalla Login
 **Descripción:** Como usuario, requiero una interfaz para autenticar mi cuenta usando mis credenciales.

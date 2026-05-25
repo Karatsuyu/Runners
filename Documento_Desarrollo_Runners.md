@@ -1169,28 +1169,31 @@ La elicitación de requisitos se basó en:
 ```mermaid
 graph TB
     subgraph "Frontend – Flutter"
-        A[Presentation Layer\nRiverpod Providers\nGoRouter\nScreens & Widgets]
-        B[Domain Layer\nEntities\nUse Cases\nRepository Interfaces]
-        C[Data Layer\nRepository Impl\nDio Datasources\nHive Storage]
+        PRES[Presentation\nScreens + Widgets\nRiverpod StateNotifier/Providers]
+        DOM[Domain\nEntities + UseCases + Repositories]
+        DATA[Data\nRemote DataSources (Dio)\nModels + Repository Impl]
+        CORE[Core\nDioClient + SecureStorage\nHiveCacheService + GoRouter + Utils]
     end
 
-    subgraph "Backend – Django DRF"
-        D[URLs / Router]
-        E[ViewSets / APIViews]
-        F[Serializers]
-        G[Models / ORM]
-        H[JWT Auth\nSimpleJWT]
-        I[SQLite / PostgreSQL]
+    subgraph "Backend – Django"
+        API[DRF API\nViews + Serializers]
+        AUTH[JWT Auth\nSimpleJWT + Blacklist]
+        CHAT[Channels\nWebSocket /ws/chat/threads/{id}/]
+        ORM[Models / ORM]
     end
 
-    A --> B
-    B --> C
-    C -->|HTTP REST\nJWT Bearer| D
-    D --> E
-    E --> F
-    F --> G
-    G --> I
-    H --> E
+    DB[(PostgreSQL / SQLite)]
+    MEDIA[(Media Storage)]
+    CHL[(Channels Layer\nInMemoryChannelLayer)]
+
+    PRES --> DOM --> DATA --> CORE
+    CORE -->|REST /api/v1/*| API
+    CORE -->|WS /ws/chat/threads/{id}/| CHAT
+    AUTH --> API
+    API --> ORM --> DB
+    ORM --> MEDIA
+    CHAT --> CHL
+    CHAT --> DB
 ```
 
 #### 14.4.2 Diagrama de Flujo – Autenticación
@@ -1198,105 +1201,144 @@ graph TB
 ```mermaid
 flowchart TD
     A([Inicio]) --> B[Abrir App]
-    B --> C{¿Token válido\nen SecureStorage?}
-    C -->|No| D[Pantalla Login]
-    C -->|Sí| E{Verificar rol\nusuario}
-    D --> F[Ingresar correo\ny contraseña]
-    F --> G[POST /api/auth/login/]
-    G --> H{¿Credenciales\nválidas?}
-    H -->|No| I[Mostrar error]
-    I --> D
-    H -->|Sí| J[Guardar access\n+ refresh token]
-    J --> E
-    E -->|CLIENTE| K[Home Tienda]
-    E -->|DOMICILIARIO| L[Panel Domicilios]
-    E -->|PRESTADOR| M[Panel Servicios]
-    E -->|ADMIN| N[Dashboard Admin]
+    B --> C{¿Token en\nSecureStorage?}
+    C -->|No| D[LoginScreen]
+    C -->|Sí| E[GET /api/v1/auth/profile/]
+    E -->|200| F{Rol del usuario}
+    E -->|401| D
+    D --> G[Ingresar email\ny contraseña]
+    G --> H[POST /api/v1/auth/login/]
+    H --> I{¿Credenciales válidas?}
+    I -->|No| J[Mostrar error]
+    I -->|Sí| K[Guardar access + refresh\nSecureStorage]
+    K --> F
+    F -->|CLIENTE| L[/client/store]
+    F -->|DOMICILIARIO| M[/deliverer/dashboard]
+    F -->|PRESTADOR| N[/provider/dashboard]
+    F -->|ADMIN| O[/admin/dashboard]
 ```
 
-#### 14.4.3 Diagrama de Flujo – Solicitud de Domicilio
+#### 14.4.3 Diagrama de Flujo – Pedido en Tienda (Cliente)
 
 ```mermaid
 flowchart TD
-    A([Cliente]) --> B[Crear solicitud\nde domicilio]
-    B --> C[POST /api/deliveries/requests/]
-    C --> D{¿Hay domiciliario\nDISPONIBLE?}
-    D -->|Sí| E[Asignar domiciliario\nde menor número]
-    D -->|No| F[Solicitud PENDIENTE\nsin domiciliario]
-    E --> G[Estado: ACEPTADO]
-    G --> H[Domiciliario\nen camino]
-    H --> I[PATCH estado\nEN_CAMINO]
-    I --> J[PATCH estado\nENTREGADO]
-    J --> K[Registrar\ncompleted_at]
-    K --> L[Generar\nFinancialRecord]
-    L --> M[Liberar domiciliario\nDISPONIBLE]
-    M --> N([Fin])
-    F --> O{¿Domiciliario\ndisponible?}
-    O -->|Sí| E
+    A([Cliente en /client/store]) --> B[GET /api/v1/store/categories/]
+    B --> C[Mostrar categorias\nfiltrar por seleccion]
+    C --> D[GET /api/v1/store/commerces/?category=id]
+    D --> E[Selecciona comercio\n/ client/store/:id]
+    E --> F[GET /api/v1/store/commerces/id/products/]
+    F --> G[Ver productos]
+
+    G --> H{Agregar producto?}
+    H -->|Si| I{Carrito de otro comercio?}
+    I -->|Si| J[clearCart\nreset _commerceId]
+    I -->|No| K[CartNotifier.addItem]
+    J --> K
+    K --> L{Seguir comprando?}
+    L -->|Si| H
+    L -->|No| M[/client/cart]
+
+    H -->|No| M
+
+    M --> N[Revisar carrito\ncartProvider.total]
+    N --> O{Ajustar cantidad?}
+    O -->|Aumentar| P[addItem]
+    O -->|Disminuir| Q[decreaseQuantity]
+    O -->|Eliminar| R[removeItem]
+    O -->|Listo| S[Confirmar pedido\ntoOrderPayload()]
+    P --> N
+    Q --> N
+    R --> N
+
+    S --> T{Autenticado?}
+    T -->|No| U[GoRouter redirect a Login]
+    T -->|Si| V[POST /api/v1/store/orders/create/]
+    V --> W[Order creada\nstatus=PENDIENTE]
+    W --> X[clearCart]
+    X --> Y[OrderConfirmScreen]
 ```
 
-#### 14.4.4 Diagrama de Flujo – Aprobación de Prestador
+#### 14.4.4 Diagrama de Flujo – Solicitud de Domicilio
 
 ```mermaid
 flowchart TD
-    A([Prestador]) --> B[Completar perfil\nfoto + HV + categoría]
-    B --> C[POST /api/services/providers/]
-    C --> D[Estado: PENDIENTE]
-    D --> E[Admin revisa\nperfil]
-    E --> F{¿Decisión?}
-    F -->|Aprobar| G[PATCH approval_status\n= APROBADO]
-    F -->|Rechazar| H[PATCH approval_status\n= RECHAZADO\n+ motivo]
-    G --> I[Prestador visible\nen directorio]
-    H --> J[Notificar rechazo\ncon motivo]
-    I --> K([Cliente puede\nsolicitar servicio])
+    A([Cliente]) --> B[Crear solicitud\nPOST /api/v1/deliveries/requests/]
+    B --> C[Estado: SOLICITADO\napproval_status=PENDIENTE]
+    C --> D[Admin revisa solicitud]
+    D --> E{¿Autoriza?}
+    E -->|No| F[PATCH /deliveries/requests/{id}/approve/\napproved=false]
+    F --> G[Estado: CANCELADO\napproval_status=RECHAZADO]
+    E -->|Sí| H[PATCH /deliveries/requests/{id}/approve/\nadmin_delivery_fee + approved=true]
+    H --> I[Asigna domiciliario DISPONIBLE\nstatus=ACEPTADO]
+    I --> J[Domiciliario atiende\nactualiza entrega]
+    J --> K[POST /deliveries/requests/{id}/complete/\nis_delivered=true]
+    K --> L[Status=ENTREGADO\ncompleted_at]
+    L --> M{¿Pago marcado?}
+    M -->|Sí| N[POST /deliveries/requests/{id}/complete/\nis_paid=true]
+    M -->|No| O[Fin entrega]\n
+    C --> P[Cliente puede cancelar\nPOST /deliveries/requests/{id}/cancel/]
 ```
 
-#### 14.4.5 Diseño Relacional
+#### 14.4.5 Diagrama de Flujo – Aprobación de Prestador
+
+```mermaid
+flowchart TD
+    A([Prestador]) --> B[Completar perfil\nfoto + HV + categoria]
+    B --> C[POST /api/v1/services/providers/register/]
+    C --> D[Estado: PENDIENTE\nrol=PRESTADOR]
+    D --> E[Admin revisa perfil]
+    E --> F{¿Decision?}
+    F -->|Aprobar| G[POST /api/v1/services/providers/{id}/approve/\naction=approve]
+    F -->|Rechazar| H[POST /api/v1/services/providers/{id}/approve/\naction=reject + reason]
+    G --> I[approval_status=APROBADO\nstatus=DISPONIBLE]
+    H --> J[approval_status=RECHAZADO\nrejection_reason]
+    I --> K([Cliente puede solicitar servicio])
+```
+
+#### 14.4.6 Diseño Relacional
 
 ```mermaid
 erDiagram
     User {
         int id PK
         string email UK
-        string password
+        string username UK
         string first_name
         string last_name
+        string phone
         string role
         bool is_active
         datetime date_joined
     }
 
-    StoreCategory {
+    Category {
         int id PK
-        string name
+        string name UK
         string description
+        string icon
+        bool is_active
+        datetime created_at
     }
 
     Commerce {
         int id PK
-        string name
-        string description
-        string city
-        string address
-        string phone
-        string logo
         int category_id FK
-        int owner_id FK
-        bool is_active
-    }
-
-    ProductCategory {
-        int id PK
         string name
+        string business_type
+        string description
+        string phone
+        string address
+        string image
+        string menu_pdf
+        bool is_active
     }
 
     Product {
         int id PK
+        int commerce_id FK
         string name
         string description
         decimal price
-        int commerce_id FK
-        int category_id FK
         string image
         bool is_available
     }
@@ -1306,10 +1348,11 @@ erDiagram
         int client_id FK
         int commerce_id FK
         string status
-        decimal total_price
+        decimal products_subtotal
+        decimal delivery_total
+        decimal total
         string notes
         datetime created_at
-        datetime updated_at
     }
 
     OrderItem {
@@ -1323,19 +1366,23 @@ erDiagram
     Deliverer {
         int id PK
         int user_id FK
+        int assigned_number UK
         string status
-        int assigned_number
+        string work_type
         bool is_active
     }
 
     DeliveryRequest {
         int id PK
         int client_id FK
+        int order_id FK
         int deliverer_id FK
-        string pickup_address
-        string delivery_address
-        decimal delivery_fee
+        string source_type
+        string request_kind
         string status
+        string approval_status
+        bool is_delivered
+        bool is_paid
         datetime completed_at
         datetime created_at
     }
@@ -1344,23 +1391,18 @@ erDiagram
         int id PK
         int deliverer_id FK
         string record_type
+        string classification
+        string reason
         decimal amount
         decimal runners_commission
-        string description
         datetime created_at
-    }
-
-    SystemConfig {
-        int id PK
-        string key UK
-        string value
-        string description
     }
 
     ServiceCategory {
         int id PK
-        string name
+        string name UK
         string description
+        bool is_active
     }
 
     ServiceProvider {
@@ -1373,9 +1415,6 @@ erDiagram
         bool terms_accepted
         string status
         string approval_status
-        string rejection_reason
-        int approved_by_id FK
-        datetime approved_at
     }
 
     ServiceRequest {
@@ -1384,12 +1423,10 @@ erDiagram
         int provider_id FK
         int category_id FK
         string description
-        datetime scheduled_date
+        string status
         decimal provider_fee
         decimal runners_fee
         decimal client_total
-        string status
-        string notes
         datetime created_at
     }
 
@@ -1400,228 +1437,668 @@ erDiagram
         string description
         string contact_type
         bool is_active
+        string approval_status
         datetime created_at
-        datetime updated_at
     }
 
-    User ||--o{ Commerce : "owns"
-    User ||--o{ Order : "places"
-    User ||--o{ DeliveryRequest : "requests"
-    User ||--o{ ServiceRequest : "requests"
-    User ||--|| Deliverer : "is a"
-    User ||--|| ServiceProvider : "is a"
-    Commerce ||--o{ Product : "contains"
-    Commerce }o--|| StoreCategory : "belongs to"
-    Order ||--o{ OrderItem : "includes"
-    Order }o--|| Commerce : "from"
-    Product ||--o{ OrderItem : "in"
-    Product }o--|| ProductCategory : "categorized as"
-    Deliverer ||--o{ DeliveryRequest : "handles"
-    Deliverer ||--o{ FinancialRecord : "has"
-    ServiceProvider }o--|| ServiceCategory : "belongs to"
-    ServiceProvider ||--o{ ServiceRequest : "receives"
-    ServiceRequest }o--|| ServiceCategory : "categorized as"
+    User ||--o{ Order : "client"
+    User ||--o{ DeliveryRequest : "client"
+    User ||--o{ ServiceRequest : "client"
+    User ||--|| Deliverer : "has"
+    User ||--|| ServiceProvider : "has"
+    Category ||--o{ Commerce : "category"
+    Commerce ||--o{ Product : "products"
+    Commerce ||--o{ Order : "orders"
+    Order ||--|{ OrderItem : "items"
+    Product ||--o{ OrderItem : "order_items"
+    Deliverer ||--o{ DeliveryRequest : "deliveries"
+    Deliverer ||--o{ FinancialRecord : "financial_records"
+    ServiceCategory ||--o{ ServiceProvider : "providers"
+    ServiceCategory ||--o{ ServiceRequest : "requests"
+    ServiceProvider ||--o{ ServiceRequest : "requests"
+    User ||--o{ Contact : "owner"
 ```
 
-#### 14.4.6 Diagrama de Clases (Dominio Flutter)
+#### 14.4.7 Diagrama de Clases (Flutter + Backend)
+
+##### 14.4.7.1 Clases Flutter (Dominio + Datos)
 
 ```mermaid
 classDiagram
+    class UserRole {
+        <<enumeration>>
+        CLIENTE
+        PRESTADOR
+        DOMICILIARIO
+        ADMIN
+    }
+
     class UserEntity {
         +int id
         +String email
+        +String? username
         +String firstName
         +String lastName
+        +String? phone
+        +String? profileImageUrl
+        +UserRole role
+        +DateTime dateJoined
+        +String fullName
+        +bool isAdmin
+        +bool isCliente
+        +bool isPrestador
+        +bool isDomiciliario
+        +List props
+    }
+
+    class UserModel {
+        +int id
+        +String email
+        +String? username
+        +String firstName
+        +String lastName
+        +String? phone
+        +String? profileImageUrl
         +String role
-        +bool isActive
+        +String dateJoined
+        +fromJson(Map) UserModel
+        +toEntity() UserEntity
     }
 
     class AuthRepository {
         <<interface>>
-        +login(email, password) Future~AuthTokens~
-        +register(data) Future~UserEntity~
-        +logout() Future~void~
-        +refreshToken(refresh) Future~AuthTokens~
+        +login(email, password) Future Either
+        +register(data) Future Either
+        +getProfile() Future Either
+        +updateProfile(...) Future Either
+        +logout() Future Either
+        +requestPasswordResetCode(email) Future Either
+        +confirmPasswordReset(...) Future Either
+    }
+
+    class AuthRepositoryImpl {
+        -AuthRemoteDataSource _dataSource
+        -SecureStorageService _storage
+        +login(email, password) Future Either
+        +register(data) Future Either
+        +getProfile() Future Either
+        +updateProfile(...) Future Either
+        +logout() Future Either
+        +requestPasswordResetCode(email) Future Either
+        +confirmPasswordReset(...) Future Either
+    }
+
+    class AuthState {
+        +UserEntity? user
+        +bool isGuest
+        +bool isLoading
+        +String? error
+        +bool isAuthenticated
+        +copyWith(...) AuthState
+        +clearUser() AuthState
     }
 
     class AuthNotifier {
-        +StateNotifier~AuthState~
-        +login(email, password) void
-        +logout() void
-        +checkAuth() void
+        -LoginUseCase _loginUseCase
+        -RegisterUseCase _registerUseCase
+        -LogoutUseCase _logoutUseCase
+        -UpdateProfileUseCase _updateProfileUseCase
+        -RequestPasswordResetCodeUseCase _requestPasswordResetCodeUseCase
+        -ConfirmPasswordResetUseCase _confirmPasswordResetUseCase
+        -AuthRepository _authRepository
+        -SecureStorageService _secureStorage
+        +checkAuthStatus() Future bool
+        +login(email, pass, rememberMe) Future bool
+        +register(data) Future bool
+        +logout() Future void
+        +continueAsGuest() void
+        +updateProfile(...) Future bool
+        +requestPasswordResetCode(email) Future String?
+        +confirmPasswordReset(...) Future String?
     }
 
-    class CommerceEntity {
+    class CategoryModel {
         +int id
         +String name
-        +String city
-        +String logo
-        +bool isActive
-    }
-
-    class ProductEntity {
-        +int id
-        +String name
-        +decimal price
-        +bool isAvailable
-    }
-
-    class CartRepository {
-        <<interface>>
-        +addItem(product, qty) void
-        +removeItem(productId) void
-        +clearCart() void
-        +getItems() List~CartItem~
-    }
-
-    class DeliveryRequestEntity {
-        +int id
-        +String pickupAddress
-        +String deliveryAddress
-        +String status
-        +DateTime? completedAt
-    }
-
-    class ServiceProviderEntity {
-        +int id
         +String description
-        +String approvalStatus
-        +String status
-    }
-
-    class ContactEntity {
-        +int id
-        +String name
-        +String phone
-        +String contactType
         +bool isActive
+        +fromJson(Map) CategoryModel
     }
 
+    class CommerceModel {
+        +int id
+        +int categoryId
+        +String categoryName
+        +String name
+        +String description
+        +String phone
+        +String address
+        +String? image
+        +String? menuPdf
+        +bool isActive
+        +fromJson(Map) CommerceModel
+    }
+
+    class ProductModel {
+        +int id
+        +int commerce
+        +String name
+        +String description
+        +double price
+        +String? image
+        +bool isAvailable
+        +fromJson(Map) ProductModel
+    }
+
+    class OrderItemInput {
+        +int productId
+        +String productName
+        +double unitPrice
+        +int quantity
+        +double subtotal
+    }
+
+    class OrderModel {
+        +int id
+        +String clientName
+        +String commerceName
+        +String status
+        +double total
+        +String notes
+        +String createdAt
+        +Color statusColor
+        +fromJson(Map) OrderModel
+    }
+
+    class CartNotifier {
+        -int? _commerceId
+        +addItem(item, commerceId) void
+        +removeItem(productId) void
+        +decreaseQuantity(productId) void
+        +clearCart() void
+        +double total
+        +int itemCount
+        +int? currentCommerceId
+        +toOrderPayload() Map
+    }
+
+    class DioClient {
+        -Dio _dio
+        -SecureStorageService _storage
+        -_addInterceptors() void
+        -_refreshToken() Future bool
+        +Dio dio
+    }
+
+    class SecureStorageService {
+        -FlutterSecureStorage _storage
+        +saveTokens(access, refresh) Future void
+        +getAccessToken() Future String?
+        +getRefreshToken() Future String?
+        +saveRememberedCredentials(...) Future void
+        +clearRememberedCredentials() Future void
+        +isRememberMeEnabled() Future bool
+        +getRememberedEmail() Future String?
+        +getRememberedPassword() Future String?
+        +clearAll() Future void
+        +clearSession() Future void
+        +hasValidSession() Future bool
+    }
+
+    UserEntity --> UserRole
+    UserModel --> UserEntity : toEntity()
+    AuthRepository <|.. AuthRepositoryImpl
     AuthNotifier --> AuthRepository
-    CartRepository --> ProductEntity
+    AuthNotifier --> SecureStorageService
+    AuthNotifier --> AuthState
+    AuthState --> UserEntity
+    CartNotifier --> OrderItemInput
+    CommerceModel --> CategoryModel
+    ProductModel --> CommerceModel
+    OrderModel --> CommerceModel
+    DioClient --> SecureStorageService
 ```
 
-#### 14.4.7 Diagramas de secuencia
+##### 14.4.7.2 Clases Backend (Django Models)
 
-Los siguientes diagramas de secuencia describen los flujos dinámicos más relevantes del sistema Runners.
+```mermaid
+classDiagram
+    direction TB
 
-##### 14.4.7.1 Autenticación y enrutamiento por rol
+    class User {
+        +int id
+        +EmailField email PK UK
+        +CharField username nullable UK
+        +CharField first_name
+        +CharField last_name
+        +CharField phone nullable
+        +ImageField profile_image nullable
+        +CharField role CLIENTE|PRESTADOR|DOMICILIARIO|ADMIN
+        +BooleanField is_active
+        +BooleanField is_staff
+        +DateTimeField date_joined
+        +DateTimeField updated_at
+        +get_full_name() str
+    }
+
+    class PasswordResetCode {
+        +int id
+        +ForeignKey user
+        +CharField code 6dig
+        +BooleanField is_used
+        +DateTimeField expires_at
+        +DateTimeField created_at
+        +bool is_expired
+        +create_for_user(user, ttl) PasswordResetCode
+    }
+
+    class Category {
+        +int id
+        +CharField name UK
+        +TextField description
+        +CharField icon
+        +BooleanField is_active
+        +DateTimeField created_at
+    }
+
+    class Commerce {
+        +int id
+        +ForeignKey category
+        +CharField name
+        +CharField business_type RESTAURANTE|TIENDA|FARMACIA|SUPERMERCADO|OTRO
+        +TextField description
+        +CharField phone
+        +CharField address
+        +ImageField image nullable
+        +FileField menu_pdf nullable
+        +BooleanField is_active
+        +DateTimeField created_at
+        +DateTimeField updated_at
+    }
+
+    class Product {
+        +int id
+        +ForeignKey commerce
+        +CharField name
+        +TextField description
+        +DecimalField price
+        +ImageField image nullable
+        +BooleanField is_available
+        +DateTimeField created_at
+        +DateTimeField updated_at
+    }
+
+    class Order {
+        +int id
+        +ForeignKey client User
+        +ForeignKey commerce
+        +CharField status PENDIENTE|CONFIRMADO|EN_PREPARACION|EN_CAMINO|ENTREGADO|CANCELADO
+        +DecimalField products_subtotal
+        +DecimalField delivery_total
+        +DecimalField total
+        +TextField notes
+        +BooleanField via_runners
+        +DateTimeField created_at
+        +DateTimeField updated_at
+        +calculate_total() void
+    }
+
+    class OrderItem {
+        +int id
+        +ForeignKey order
+        +ForeignKey product
+        +PositiveIntegerField quantity
+        +DecimalField unit_price
+        +Decimal subtotal
+    }
+
+    class Deliverer {
+        +int id
+        +OneToOneField user
+        +PositiveIntegerField assigned_number UK
+        +CharField status DISPONIBLE|OCUPADO|INACTIVO
+        +CharField work_type INDEPENDIENTE|EMPRESA
+        +BooleanField is_active
+        +DateTimeField created_at
+        +Decimal current_balance
+    }
+
+    class DeliveryRequest {
+        +int id
+        +ForeignKey client User
+        +ForeignKey order nullable
+        +ForeignKey deliverer nullable
+        +TextField description
+        +CharField source_type GENERAL|STORE
+        +CharField request_kind RECOGER_ENTREGAR|COMPRA_SENCILLA|SUPERMERCADO|MULTIPUNTO
+        +ForeignKey commerce nullable
+        +ForeignKey zone nullable
+        +PositiveIntegerField points_count
+        +PositiveIntegerField items_count
+        +BooleanField is_transfer_payment
+        +DecimalField product_amount
+        +DecimalField transfer_surcharge
+        +CharField status SOLICITADO|ACEPTADO|EN_CAMINO|ENTREGADO|CANCELADO
+        +CharField approval_status PENDIENTE|AUTORIZADO|RECHAZADO
+        +ForeignKey approved_by nullable
+        +DateTimeField approved_at nullable
+        +CharField pickup_address
+        +CharField delivery_address
+        +DecimalField delivery_fee nullable
+        +BooleanField is_delivered
+        +BooleanField is_paid
+        +DateTimeField completed_at nullable
+    }
+
+    class FinancialRecord {
+        +int id
+        +ForeignKey deliverer
+        +CharField record_type INGRESO|EGRESO
+        +CharField classification NEGRO|ROJO|AZUL
+        +CharField reason PRODUCTO|DOMICILIO|RECARGO_TRANSFERENCIA|CONSIGNACION_BASE|COBRO_DEUDA_CLIENTE|AJUSTE_MANUAL
+        +DecimalField amount
+        +CharField description
+        +DecimalField runners_commission
+        +BooleanField affects_balance
+        +ForeignKey related_delivery nullable
+        +DateTimeField created_at
+    }
+
+    class ServiceCategory {
+        +int id
+        +CharField name UK
+        +TextField description
+        +BooleanField is_active
+    }
+
+    class ServiceProvider {
+        +int id
+        +OneToOneField user
+        +ForeignKey category
+        +TextField description
+        +ImageField photo nullable
+        +FileField resume
+        +BooleanField terms_accepted
+        +CharField status DISPONIBLE|OCUPADO|INACTIVO
+        +CharField approval_status PENDIENTE|APROBADO|RECHAZADO
+        +TextField rejection_reason nullable
+        +ForeignKey approved_by nullable
+        +DateTimeField approved_at nullable
+    }
+
+    class ServiceRequest {
+        +int id
+        +ForeignKey client User
+        +ForeignKey provider ServiceProvider
+        +ForeignKey category ServiceCategory
+        +TextField description
+        +CharField status REGISTRADA|ASIGNADA|EN_PROCESO|COMPLETADA|CANCELADA
+        +DecimalField provider_fee nullable
+        +DecimalField runners_fee nullable
+        +DecimalField client_total nullable
+    }
+
+    class Contact {
+        +int id
+        +CharField name
+        +CharField phone
+        +EmailField email
+        +ImageField image nullable
+        +TextField description
+        +CharField contact_type EMERGENCIA|PROFESIONAL|COMERCIO|CONTACTO|SERVICIO|OTRO
+        +BooleanField is_active
+        +ForeignKey owner nullable
+        +CharField approval_status PENDIENTE|APROBADO|RECHAZADO
+        +ForeignKey reviewed_by nullable
+        +TextField rejection_reason
+    }
+
+    User "1" --> "0..*" PasswordResetCode
+    User "1" --> "0..1" Deliverer : OneToOne
+    User "1" --> "0..1" ServiceProvider : OneToOne
+    User "1" --> "0..*" Order : client
+    User "1" --> "0..*" DeliveryRequest : client
+    User "1" --> "0..*" ServiceRequest : client
+    User "1" --> "0..*" Contact : owner
+
+    Category "1" --> "0..*" Commerce
+    Commerce "1" --> "0..*" Product
+    Commerce "1" --> "0..*" Order
+    Order "1" --> "1..*" OrderItem
+    OrderItem --> Product
+
+    Deliverer "1" --> "0..*" DeliveryRequest
+    Deliverer "1" --> "0..*" FinancialRecord
+    DeliveryRequest --> Order : nullable
+    FinancialRecord --> DeliveryRequest : nullable
+
+    ServiceCategory "1" --> "0..*" ServiceProvider
+    ServiceProvider "1" --> "0..*" ServiceRequest
+    ServiceCategory "1" --> "0..*" ServiceRequest
+```
+
+#### 14.4.8 Diagramas de secuencia
+
+Los siguientes diagramas de secuencia cubren cada requisito funcional (REQ-01 a REQ-28) y reflejan la implementación actual.
+
+##### 14.4.7.1 REQ-01 — Registro de usuario
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as Usuario
     participant F as App Flutter
-    participant A as API Auth (Django)
-    participant R as Router (GoRouter)
-
-    U->>F: Ingresa correo y contraseña
-    F->>A: POST /api/v1/auth/login (email, password)
-    A-->>F: 200 OK (access, refresh, rol)
-    F->>F: Guarda tokens en SecureStorage
-    F->>R: Notifica rol autenticado
-    R-->>F: Redirige a Shell correspondiente
-    F-->>U: Muestra pantalla inicial según rol
-```
-
-##### 14.4.7.2 Compra en tienda y creación de orden
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Cliente
-    participant F as App Flutter
-    participant S as API Store (DRF)
+    participant A as API Auth
     participant DB as BD
 
-    C->>F: Agrega producto(s) al carrito
-    F->>F: Persiste ítems en Hive
-    C->>F: Revisa y confirma carrito
-    F->>S: POST /api/v1/store/orders (detalle carrito)
-    S->>DB: Inserta Order y OrderItems
-    DB-->>S: Orden persistida
-    S-->>F: 201 Created (orden con estado PENDIENTE)
-    F-->>C: Muestra resumen de compra y estado inicial
-```
-
-##### 14.4.7.3 Solicitud de domicilio con asignación automática
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Cliente
-    participant F as App Flutter
-    participant DAPI as API Deliveries (DRF)
-    participant D as Domiciliario
-    participant DB as BD
-
-    C->>F: Completa formulario de domicilio
-    F->>DAPI: POST /api/v1/deliveries/requests
-    DAPI->>DB: Busca domiciliario DISPONIBLE
-    DB-->>DAPI: Retorna domiciliario seleccionado
-    DAPI->>DB: Crea DeliveryRequest (estado ACEPTADO/PENDIENTE)
-    DB-->>DAPI: Solicitud guardada
-    DAPI-->>F: 201 Created (con info de domiciliario/estado)
-    F-->>C: Muestra detalle y estado del domicilio
-    DAPI-->>D: Nueva solicitud asignada (lista o notificación)
-    D->>DAPI: PATCH /requests/{id} (EN_CAMINO/ENTREGADO)
-    DAPI->>DB: Actualiza estado y registra FinancialRecord
-    DB-->>DAPI: Actualización confirmada
-    DAPI-->>F: Respuesta OK
-    F-->>C: Actualiza estado en pantalla
-```
-
-##### 14.4.7.4 Registro de usuario con emisión de tokens
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as Usuario
-    participant F as App Flutter
-    participant A as API Usuarios (RegisterView)
-    participant DB as BD
-
-    U->>F: Diligencia formulario de registro
-    F->>A: POST /api/v1/auth/register (datos personales)
-    A->>DB: Valida y crea nuevo User
+    U->>F: Completa formulario de registro
+    F->>A: POST /api/v1/auth/register/
+    A->>DB: Crea User
     DB-->>A: Usuario creado
-    A->>A: Genera tokens JWT (access, refresh)
-    A-->>F: 201 Created (user + tokens)
+    A-->>F: 201 (user + tokens)
+    F->>A: GET /api/v1/auth/profile/
     F->>F: Guarda tokens en SecureStorage
-    F-->>U: Muestra pantalla inicial (rol CLIENTE o flujo PRESTADOR pendiente)
+    A->>DB: Consulta perfil creado
+    DB-->>A: Perfil con rol
+    A-->>F: Perfil con rol
+    F-->>U: Redirige a Home segun rol
 ```
 
-##### 14.4.7.5 Registro y aprobación de prestador de servicios
+##### 14.4.7.2 REQ-02 — Inicio de sesion con JWT
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant P as Usuario
+    participant U as Usuario
     participant F as App Flutter
-    participant S as API Servicios
-    participant A as Admin
+    participant A as API Auth
     participant DB as BD
 
-    P->>F: Completa perfil de prestador (foto, HV, categoría)
-    F->>S: POST /api/v1/services/providers/register
-    S->>DB: Crea ServiceProvider (approval_status = PENDIENTE)
-    S->>DB: Actualiza rol de usuario a PRESTADOR
-    DB-->>S: Cambios guardados
-    S-->>F: 201 Created (prestador pendiente de aprobación)
-    F-->>P: Muestra estado "En revisión por administrador"
-
-    A->>F: Abre módulo de aprobación de prestadores
-    F->>S: GET /api/v1/services/providers?approval_status=PENDIENTE
-    S-->>F: Lista de prestadores pendientes
-    A->>F: Aprueba o rechaza prestador seleccionado
-    F->>S: POST /api/v1/services/providers/{id}/approve (action=approve|reject)
-    S->>DB: Actualiza approval_status y campos de auditoría
-    DB-->>S: Actualización confirmada
-    S-->>F: Respuesta con estado final del prestador
-    F-->>P: Notifica resultado de aprobación/rechazo
+    U->>F: Ingresa email y password
+    F->>A: POST /api/v1/auth/login/
+    A->>DB: Valida credenciales y estado
+    DB-->>A: Usuario autenticado
+    A-->>F: 200 (access, refresh)
+    F->>F: Guarda tokens en SecureStorage
+    F->>A: GET /api/v1/auth/profile/
+    A->>DB: Consulta perfil y rol
+    DB-->>A: Perfil con rol
+    A-->>F: Perfil con rol
+    F-->>U: Navega a dashboard por rol
 ```
 
-##### 14.4.7.6 Solicitud de servicio entre cliente y prestador
+##### 14.4.7.3 REQ-03 — Listado de comercios/productos por categoria
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant S as API Store
+    participant DB as BD
+
+    C->>F: Abre modulo Tienda
+    F->>S: GET /api/v1/store/categories/
+    S->>DB: Consulta categorias activas
+    DB-->>S: Lista de categorias
+    S-->>F: Lista de categorias
+    C->>F: Selecciona categoria
+    F->>S: GET /api/v1/store/commerces/?category={id}
+    S->>DB: Consulta comercios por categoria
+    DB-->>S: Comercios filtrados
+    S-->>F: Comercios filtrados
+    C->>F: Abre comercio
+    F->>S: GET /api/v1/store/commerces/{id}/products/
+    S->>DB: Consulta productos del comercio
+    DB-->>S: Lista de productos
+    S-->>F: Lista de productos
+```
+
+##### 14.4.7.4 REQ-04 — Solicitud de domicilio desde tienda
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    C->>F: Selecciona tienda/producto
+    F->>F: Abre formulario de domicilio
+    C->>F: Completa origen (tienda)\ny destino (dirección cliente)
+    F->>D: POST /api/v1/deliveries/requests/ (source_type=STORE)
+    D->>DB: Crea DeliveryRequest
+    DB-->>D: Solicitud registrada
+    D-->>F: 201 (status=SOLICITADO, approval=PENDIENTE)
+    F-->>C: Muestra solicitud creada
+```
+
+##### 14.4.7.5 REQ-05 — Creacion y seguimiento de ordenes
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant S as API Store
+    participant DB as BD
+
+    C->>F: Confirma pedido
+    F->>S: POST /api/v1/store/orders/create/ (commerce_id, items)
+    S->>DB: Crea Order + OrderItems
+    DB-->>S: Orden creada
+    S-->>F: 201 (Order)
+    F-->>C: Muestra confirmacion y estado
+    C->>F: Consulta historial
+    F->>S: GET /api/v1/store/orders/
+    S->>DB: Consulta pedidos del cliente
+    DB-->>S: Lista de pedidos
+    S-->>F: Lista de pedidos
+```
+
+##### 14.4.7.6 REQ-06 — Solicitud de domicilio
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    C->>F: Completa formulario
+    F->>D: POST /api/v1/deliveries/requests/ (pickup, delivery, description)
+    D->>DB: Crea DeliveryRequest
+    DB-->>D: Solicitud registrada
+    D-->>F: 201 (status=SOLICITADO, approval=PENDIENTE)
+    F-->>C: Muestra solicitud creada
+```
+
+##### 14.4.7.7 REQ-07 — Asignacion automatica de domiciliario
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    A->>F: Abre solicitudes pendientes
+    F->>D: GET /api/v1/deliveries/requests/
+    D->>DB: Consulta solicitudes pendientes
+    DB-->>D: Lista de solicitudes
+    D-->>F: Lista de solicitudes
+    A->>F: Autoriza solicitud
+    F->>D: PATCH /api/v1/deliveries/requests/{id}/approve/ (approved=true, admin_delivery_fee)
+    D->>DB: Actualiza solicitud y asigna domiciliario disponible
+    DB-->>D: Solicitud actualizada
+    D-->>F: Asigna domiciliario DISPONIBLE\nstatus=ACEPTADO
+    Note over D,F: Si no hay domiciliarios DISPONIBLE -> 409
+```
+
+##### 14.4.7.8 REQ-08 — Seguimiento del estado del domicilio
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant Dm as Domiciliario
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    C->>F: Consulta mis domicilios
+    F->>D: GET /api/v1/deliveries/requests/
+    D->>DB: Consulta solicitudes del cliente
+    DB-->>D: Estados actuales
+    D-->>F: Estados actuales
+    Dm->>F: Marca entrega
+    F->>D: POST /api/v1/deliveries/requests/{id}/complete/ (is_delivered=true)
+    D->>DB: Actualiza estado, completed_at y flags
+    DB-->>D: Entrega registrada
+    D-->>F: Status=ENTREGADO
+    F-->>C: Estado actualizado
+```
+
+##### 14.4.7.9 REQ-09 — Registro de prestadores
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Prestador
+    participant F as App Flutter
+    participant S as API Servicios
+    participant DB as BD
+
+    P->>F: Completa perfil y adjunta HV
+    F->>S: POST /api/v1/services/providers/register/
+    S->>DB: Crea ServiceProvider
+    DB-->>S: Perfil registrado
+    S-->>F: 201 (approval_status=PENDIENTE)
+    F-->>P: Estado "En revision"
+```
+
+##### 14.4.7.10 REQ-10 — Aprobacion/rechazo de prestadores
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant S as API Servicios
+    participant DB as BD
+
+    A->>F: Revisa perfil
+    F->>S: POST /api/v1/services/providers/{id}/approve/ (action=approve|reject)
+    S->>DB: Actualiza approval_status y motivo
+    DB-->>S: Prestador actualizado
+    S-->>F: approval_status actualizado
+    F-->>A: Muestra resultado
+```
+
+##### 14.4.7.11 REQ-11 — Solicitud de servicio
 
 ```mermaid
 sequenceDiagram
@@ -1629,45 +2106,519 @@ sequenceDiagram
     participant C as Cliente
     participant F as App Flutter
     participant S as API Servicios
-    participant P as Prestador
     participant DB as BD
 
-    C->>F: Explora directorio de prestadores aprobados
-    F->>S: GET /api/v1/services/providers?approval_status=APROBADO
-    S-->>F: Lista de prestadores disponibles
-    C->>F: Selecciona prestador y define fecha/descripción
-    F->>S: POST /api/v1/services/requests (payload solicitud)
-    S->>DB: Crea ServiceRequest (status = REGISTRADA)
-    DB-->>S: Solicitud guardada
-    S-->>F: 201 Created (detalle solicitud)
-    F-->>C: Muestra confirmación y estado inicial
-
-    P->>F: Abre pantalla de "Mis solicitudes"
-    F->>S: GET /api/v1/services/requests (rol PRESTADOR)
-    S-->>F: Solicitudes asignadas al prestador
-    P-->>F: Gestiona solicitud (aceptar, rechazar, marcar completada)
+    C->>F: Selecciona prestador
+    F->>S: POST /api/v1/services/requests/create/
+    S->>DB: Crea ServiceRequest
+    DB-->>S: Solicitud registrada
+    S-->>F: 201 (status=REGISTRADA)
+    F-->>C: Confirmacion de solicitud
 ```
 
-##### 14.4.7.7 Consulta de directorio de contactos y dashboard administrador
+##### 14.4.7.12 REQ-12 — Directorio de contactos
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant U as Usuario
-    participant Adm as Admin
     participant F as App Flutter
     participant CAPI as API Contactos
-    participant RAPI as API Reportes
+    participant DB as BD
 
-    U->>F: Abre módulo de contactos
-    F->>CAPI: GET /api/v1/contacts?type=EMERGENCIA|COMERCIO|PROFESIONAL
-    CAPI-->>F: Lista de contactos activos filtrados
-    F-->>U: Muestra contactos con acción de llamada rápida
+    U->>F: Abre Contactos
+    F->>CAPI: GET /api/v1/contacts/
+    CAPI->>DB: Consulta contactos activos
+    DB-->>CAPI: Lista de contactos
+    CAPI-->>F: Lista de contactos
+    F-->>U: Renderiza directorio
+```
 
-    Adm->>F: Accede al dashboard administrativo
-    F->>RAPI: GET /api/v1/reports/dashboard_summary
-    RAPI-->>F: Métricas de usuarios, órdenes, domicilios y servicios
-    F-->>Adm: Renderiza tarjetas y gráficos del panel admin
+##### 14.4.7.13 REQ-13 — Dashboard administrativo
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant R as API Reportes
+    participant DB as BD
+
+    A->>F: Abre Dashboard
+    F->>R: GET /api/v1/reports/dashboard/
+    R->>DB: Agrupa metricas operativas
+    DB-->>R: Datos agregados
+    R-->>F: Resumen de metricas
+    F-->>A: Tarjetas y graficos
+```
+
+##### 14.4.7.14 REQ-14 — Reportes por modulo
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant R as API Reportes
+    participant DB as BD
+
+    A->>F: Selecciona periodo
+    F->>R: GET /api/v1/reports/deliveries/?days=30
+    R->>DB: Consulta domicilios del periodo
+    DB-->>R: Datos de domicilios
+    R-->>F: Reporte de domicilios
+    F->>R: GET /api/v1/reports/services/?days=30
+    R->>DB: Consulta servicios del periodo
+    DB-->>R: Datos de servicios
+    R-->>F: Reporte de servicios
+    F->>R: GET /api/v1/reports/sales/?days=30
+    R->>DB: Consulta ventas del periodo
+    DB-->>R: Datos de ventas
+    R-->>F: Reporte de ventas
+```
+
+##### 14.4.7.15 REQ-15 — Gestion de usuarios, comercios y configuracion
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant S as API Store
+    participant DB as BD
+
+    A->>F: Administra comercios
+    F->>S: GET /api/v1/store/admin/commerces/
+    S->>DB: Consulta comercios administrables
+    DB-->>S: Lista completa
+    S-->>F: Lista completa
+    A->>F: Edita comercio
+    F->>S: PATCH /api/v1/store/admin/commerces/{id}/
+    S->>DB: Actualiza comercio
+    DB-->>S: Comercio actualizado
+    S-->>F: Comercio actualizado
+    Note over A,F: Gestion de usuarios/configuracion no tiene\nendpoint expuesto en la API actual.
+```
+
+##### 14.4.7.16 REQ-16 — Registro y gestion de domiciliarios
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    A->>F: Crea domiciliario
+    F->>D: POST /api/v1/deliveries/admin/deliverers/
+    D->>DB: Crea Deliverer
+    DB-->>D: Domiciliario creado
+    D-->>F: 201 (assigned_number validado)
+    A->>F: Cambia estado activo
+    F->>D: POST /api/v1/deliveries/deliverers/{id}/toggle-status/
+    D->>DB: Actualiza estado del domiciliario
+    DB-->>D: Estado actualizado
+    D-->>F: Estado actualizado
+```
+
+##### 14.4.7.17 REQ-17 — Registro de ingresos y egresos
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dm as Domiciliario
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    Dm->>F: Registra movimiento
+    F->>D: POST /api/v1/deliveries/records/ (amount, reason)
+    D->>DB: Crea FinancialRecord
+    DB-->>D: Registro financiero creado
+    D-->>F: Registro financiero creado
+    F-->>Dm: Balance actualizado
+```
+
+##### 14.4.7.18 REQ-18 — Cierre de sesion seguro
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant F as App Flutter
+    participant A as API Auth
+    participant DB as BD
+
+    U->>F: Cerrar sesion
+    F->>A: POST /api/v1/auth/logout/
+    A->>DB: Blacklist del refresh token
+    DB-->>A: Token invalidado
+    A-->>F: 200 (token invalidado)
+    F->>F: Limpia SecureStorage
+    F-->>U: Redirige a login
+```
+
+##### 14.4.7.19 REQ-19 — Control de acceso por rol
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant F as App Flutter
+    participant API as API Django
+
+    U->>F: Navega a modulo restringido
+    F->>API: GET /api/v1/... (con JWT)
+    API-->>F: 403 Forbidden si rol no permitido
+    F-->>U: Muestra mensaje y redirige
+```
+
+##### 14.4.7.20 REQ-20 — Busqueda de prestadores por categoria
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant S as API Servicios
+    participant DB as BD
+
+    C->>F: Selecciona categoria
+    F->>S: GET /api/v1/services/providers/?category={id}
+    S->>DB: Consulta prestadores aprobados y disponibles
+    DB-->>S: Lista filtrada
+    S-->>F: Prestadores APROBADO + DISPONIBLE
+    F-->>C: Lista filtrada
+```
+
+##### 14.4.7.21 REQ-21 — Estado del prestador
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant P as Prestador
+    participant F as App Flutter
+    participant S as API Servicios
+    participant DB as BD
+
+    P->>F: Cambia estado
+    F->>S: PATCH /api/v1/services/providers/status/ (status)
+    S->>DB: Actualiza estado del prestador
+    DB-->>S: Estado actualizado
+    S-->>F: Estado actualizado
+    F-->>P: Confirmacion
+```
+
+##### 14.4.7.22 REQ-22 — Estado del domiciliario
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dm as Domiciliario
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    Dm->>F: Cambia estado operativo
+    F->>D: PATCH /api/v1/deliveries/deliverers/status/ (status)
+    D->>DB: Actualiza estado del domiciliario
+    DB-->>D: Estado actualizado
+    D-->>F: Estado actualizado
+    F-->>Dm: Confirmacion
+```
+
+##### 14.4.7.23 REQ-23 — Solicitud directa de domicilio
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Cliente
+    participant F as App Flutter
+    participant D as API Deliveries
+    participant DB as BD
+
+    C->>F: Selecciona domiciliario
+    Note over C,F: La API actual no recibe deliverer_id
+    F->>D: POST /api/v1/deliveries/requests/
+    D->>DB: Crea DeliveryRequest
+    DB-->>D: Solicitud creada
+    D-->>F: Solicitud creada (sin asignacion directa)
+    Note over D,F: La asignacion se realiza via approve (admin)
+```
+
+##### 14.4.7.24 REQ-24 — Filtrado de contactos
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as Usuario
+    participant F as App Flutter
+    participant CAPI as API Contactos
+    participant DB as BD
+
+    U->>F: Aplica filtro tipo
+    F->>CAPI: GET /api/v1/contacts/?type=emergency|professional|commerce|other
+    CAPI->>DB: Consulta contactos por tipo
+    DB-->>CAPI: Resultados filtrados
+    CAPI-->>F: Resultados filtrados
+    F-->>U: Muestra lista
+```
+
+##### 14.4.7.25 REQ-25 — Reporte financiero de domiciliarios
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as Admin
+    participant F as App Flutter
+    participant R as API Reportes
+    participant DB as BD
+
+    A->>F: Abre reporte financiero
+    F->>R: GET /api/v1/reports/deliverers/
+    R->>DB: Agrupa ingresos, egresos y comisiones
+    DB-->>R: Totales por domiciliario
+    R-->>F: Totales por domiciliario
+    F-->>A: Renderiza reporte
+```
+
+##### 14.4.7.26 REQ-26 — Variables de entorno
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Env as Entorno
+    participant Django as Backend
+    participant Flutter as App
+
+    Env->>Django: Carga SECRET_KEY, DB, CORS
+    Env->>Flutter: Carga API_BASE_URL
+    Django-->>Env: Inicia con valores configurados
+    Flutter-->>Env: Inicia con valores configurados
+```
+
+##### 14.4.7.27 REQ-27 — PostgreSQL en produccion
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Ops as Infra
+    participant Django as Backend
+    participant PG as PostgreSQL
+
+    Ops->>Django: Configura DATABASE_URL
+    Django->>PG: Ejecuta migraciones
+    PG-->>Django: Conexion OK
+```
+
+##### 14.4.7.28 REQ-28 — Configuracion CORS segura
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Cliente
+    participant CORS as Middleware CORS
+    participant API as API Django
+
+    Client->>CORS: Request con Origin
+    CORS->>API: Permite si origin autorizado
+    API-->>Client: Respuesta OK
+    Note over CORS,Client: Origen no autorizado -> 403
+```
+
+#### 14.4.9 Diagrama de Componentes
+
+```mermaid
+flowchart LR
+    subgraph "Flutter App"
+        FEAT[features/\n(auth, store, services, deliveries, contacts, admin)]
+        CORE_FL[core/\nnetwork, router, storage]
+        SHARED[shared/\nwidgets, utils]
+    end
+
+    subgraph "Backend API"
+        USERS[apps.users]
+        STORE[apps.store]
+        SVC[apps.services]
+        DEL[apps.deliveries]
+        CONT[apps.contacts]
+        RPT[apps.reports]
+        CHAT[apps.chat]
+    end
+
+    DB[(PostgreSQL/SQLite)]
+    MEDIA[(Media Storage)]
+
+    FEAT --> CORE_FL
+    FEAT --> SHARED
+    CORE_FL --> USERS
+    CORE_FL --> STORE
+    CORE_FL --> SVC
+    CORE_FL --> DEL
+    CORE_FL --> CONT
+    CORE_FL --> RPT
+    CORE_FL --> CHAT
+    USERS --> DB
+    STORE --> DB
+    SVC --> DB
+    DEL --> DB
+    CONT --> DB
+    CHAT --> DB
+    USERS --> MEDIA
+    STORE --> MEDIA
+    SVC --> MEDIA
+    CONT --> MEDIA
+```
+
+#### 14.4.10 Diagrama de Objetos
+
+##### 14.4.10.1 Objetos Flutter (estado en runtime)
+
+```mermaid
+classDiagram
+    class "authState : AuthState" <<object>> {
+        user = userEntity
+        isGuest = false
+        isLoading = false
+        error = null
+        isAuthenticated = true
+    }
+
+    class "userEntity : UserEntity" <<object>> {
+        id = 42
+        email = "carlos@runners.co"
+        firstName = "Carlos"
+        lastName = "Ramirez"
+        role = UserRole.CLIENTE
+    }
+
+    class "cartNotifier : CartNotifier" <<object>> {
+        _commerceId = 7
+        itemCount = 3
+        total = 47500.0
+    }
+
+    class "item1 : OrderItemInput" <<object>> {
+        productId = 101
+        productName = "Hamburguesa Clasica"
+        unitPrice = 18000.0
+        quantity = 2
+    }
+
+    class "order : OrderModel" <<object>> {
+        id = 309
+        commerceName = "Burger House"
+        status = "PENDIENTE"
+        total = 47500.0
+    }
+
+    "authState : AuthState" --> "userEntity : UserEntity"
+    "cartNotifier : CartNotifier" --> "item1 : OrderItemInput"
+    "cartNotifier : CartNotifier" --> "order : OrderModel"
+```
+
+##### 14.4.10.2 Objetos Backend (instancias persistidas)
+
+```mermaid
+classDiagram
+    class "user42 : User" <<object>> {
+        id = 42
+        email = "carlos@runners.co"
+        first_name = "Carlos"
+        last_name = "Ramirez"
+        role = "CLIENTE"
+        is_active = true
+    }
+
+    class "category3 : Category" <<object>> {
+        id = 3
+        name = "Comida Rapida"
+        is_active = true
+    }
+
+    class "commerce7 : Commerce" <<object>> {
+        id = 7
+        category_id = 3
+        name = "Burger House"
+        business_type = "RESTAURANTE"
+        address = "Cra 15 #72-41"
+        is_active = true
+    }
+
+    class "order309 : Order" <<object>> {
+        id = 309
+        client_id = 42
+        commerce_id = 7
+        status = "PENDIENTE"
+        products_subtotal = 47500.00
+        delivery_total = 0.00
+        total = 47500.00
+        via_runners = true
+    }
+
+    class "orderItem1 : OrderItem" <<object>> {
+        id = 801
+        order_id = 309
+        product_id = 101
+        quantity = 2
+        unit_price = 18000.00
+        subtotal = 36000.00
+    }
+
+    class "deliverer3 : Deliverer" <<object>> {
+        id = 3
+        user_id = 17
+        assigned_number = 3
+        status = "DISPONIBLE"
+        work_type = "EMPRESA"
+    }
+
+    class "deliveryReq : DeliveryRequest" <<object>> {
+        id = 512
+        client_id = 42
+        order_id = 309
+        deliverer_id = 3
+        source_type = "STORE"
+        request_kind = "RECOGER_ENTREGAR"
+        commerce_id = 7
+        status = "SOLICITADO"
+        approval_status = "PENDIENTE"
+        is_transfer_payment = false
+        is_delivered = false
+        is_paid = false
+    }
+
+    "user42 : User" --> "order309 : Order" : client
+    "commerce7 : Commerce" --> "order309 : Order"
+    "category3 : Category" --> "commerce7 : Commerce"
+    "order309 : Order" --> "orderItem1 : OrderItem"
+    "order309 : Order" --> "deliveryReq : DeliveryRequest"
+    "deliverer3 : Deliverer" --> "deliveryReq : DeliveryRequest"
+```
+
+#### 14.4.11 Diagrama de Despliegue
+
+```mermaid
+flowchart TB
+    subgraph "Cliente"
+        Mobile[App Flutter]
+    end
+
+    subgraph "Servidor"
+        API[Django API + DRF]
+        WSGI[WSGI Server]
+        ASGI[ASGI Server (Channels)]
+    end
+
+    DB[(PostgreSQL/SQLite)]
+    Storage[(Media Storage)]
+
+    Mobile -->|HTTPS| API
+    Mobile -->|WSS| ASGI
+    API --> WSGI
+    API --> DB
+    API --> Storage
 ```
 
 ### 14.5 Prototipado
