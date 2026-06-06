@@ -1,0 +1,10 @@
+frontend/android/app/build/
+frontend/build/
+build/
+backend/.venv/
+frontend/.gradle/
+*.apk
+*.aab
+*.so
+*.dll
+*.lib
